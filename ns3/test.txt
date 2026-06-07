@@ -1,0 +1,25 @@
+필수 패키지들 설치
+sudo apt install g++ python3 cmake ninja-build git libsqlite3-dev libxml2-dev libgtk-3-dev libboost-all-dev libssl-dev qtbase5-dev
+
+공식 소스 다운로드 및 빌드 (ns-3.48)
+https://www.nsnam.org/
+에서 다운로드 후 우분투에 복사
+
+압축 풀기
+tar -xvf ns-3.48.tar.bz2
+
+압축이 풀린 폴더로 이동
+cd ns-3.48
+
+빌드 설정 및 시작 (논문용 대규모 데이터를 뽑을 때 (실전용))
+./ns3 configure --build-profile=optimized
+./ns3 build
+
+기본모드로 빌드 (처음 배우고 실습할 때 (현재 추천))
+./ns3 configure --build-profile=default --enable-examples
+./ns3 build
+
+무조건 ns-3.48 폴더 내부에서 작업해야 함.
+ns-3.48 폴더 안에 있는 scratch (스크래치)라는 폴더 안에 네가 짤 C++ 코드를 만들어야 함.
+
+scratchbu에 백업해놓음
