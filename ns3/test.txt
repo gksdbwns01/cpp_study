@@ -23,3 +23,5 @@ cd ns-3.48
 ns-3.48 폴더 안에 있는 scratch (스크래치)라는 폴더 안에 네가 짤 C++ 코드를 만들어야 함.
 
 scratchbu에 백업해놓음
+
+실행 예시-> ./ns3 run my_test
