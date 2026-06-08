@@ -1,0 +1,11 @@
+<routes>
+    <vType id="car" accel="0.8" decel="4.5" length="5" maxSpeed="15"/>
+
+    <route id="route_S_N" edges="-E2 -E0"/>
+    
+    <route id="route_W_E" edges="-E3 E1"/>
+
+    <flow id="flow_up" route="route_S_N" type="car" begin="0" end="50" period="2"/>
+    
+    <flow id="flow_right" route="route_W_E" type="car" begin="0" end="50" period="3"/>
+</routes>

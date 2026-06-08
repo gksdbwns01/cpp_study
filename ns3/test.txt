@@ -29,3 +29,18 @@ scratchbu에 백업해놓음
 NS-3가 새로 생긴 파일들을 다시 스캔하도록 터미널에서 설정(Configure) 명령어 입력
 1. cd ~/cpp_study/ns3/ns-3.48
 2. ./ns3 configure --build-profile=default
+
+SUMO + NS-3 Co-simulation 파이프라인 세팅
+gksdbwns@DESKTOP-PDHFAPH:~/cpp_study/ns3/ns-3.48$ 경로에서 명령어 실행
+sudo apt update
+sudo apt install sumo sumo-tools
+netedit 로 실행확인
+
+차량 경로 파일 + 종합 실행 파일 만들기
+sumo-gui -c cross.sumocfg 로 실행 (딜레이 200~300지정)
+
+차량 이동 기록(Trace) 추출
+sumo -c cross.sumocfg --fcd-output cross_trace.xml
+
+NS-3가 읽을 수 있는 언어로 '번역'
+python3 /usr/share/sumo/tools/traceExporter.py --fcd-input cross_trace.xml --ns2mobility-output cross_mobility.tcl
