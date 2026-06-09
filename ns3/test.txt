@@ -44,3 +44,7 @@ sumo -c cross.sumocfg --fcd-output cross_trace.xml
 
 NS-3가 읽을 수 있는 언어로 '번역'
 python3 /usr/share/sumo/tools/traceExporter.py --fcd-input cross_trace.xml --ns2mobility-output cross_mobility.tcl
+
+C++ 코드에 차량 움직임 이식 후 빌드와 실행 (ns-3.48 경로에서)
+./ns3 build
+./ns3 run scratch/netedit01/vanet_test
