@@ -77,3 +77,11 @@ make
 차이점 : 원점 (0,0) 위치, Y값이 커지는 방향, 자동차의 움직임 순
 SUMO (수학/지도 좌표계)         :맵의 정중앙 (또는 왼쪽 아래), 위쪽 (북쪽, ↑), 남쪽(-100) ➡️ 북쪽(+100)으로 직진
 NetAnim / NS-3 (화면 좌표계)    :화면의 왼쪽 맨 위 (Top-Left), 아래쪽 (남쪽, ↓), 위쪽(-100) ➡️ 아래쪽(+100)으로 직진
+
+시뮬 실행(SUMO, NS-3 시뮬레이션(네트워크 및 애니메이션 파일 생성), NetAnim 시뮬레이션)
+cd ~/cpp_study/ns3/ns-3.48/scratch/netedit01
+sumo-gui -c cross.sumocfg
+cd ~/cpp_study/ns3/ns-3.48
+./ns3 run scratch/netedit01/vanet_test
+cd ~/cpp_study/ns3/netanim/build
+./netanim
