@@ -48,3 +48,32 @@ python3 /usr/share/sumo/tools/traceExporter.py --fcd-input cross_trace.xml --ns2
 C++ 코드에 차량 움직임 이식 후 빌드와 실행 (ns-3.48 경로에서)
 ./ns3 build
 ./ns3 run scratch/netedit01/vanet_test
+
+와이어샤크 설치
+sudo apt update
+sudo apt install wireshark -y
+
+NetAnim 시각화 툴 설치
+sudo apt update
+sudo apt install qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools -y
+
+NetAnim 소스코드 다운로드 및 빌드
+# 1. ns3 폴더로 이동
+cd ~/cpp_study/ns3/
+# 2. NetAnim 코드 다운로드 (Git)
+git clone https://gitlab.com/nsnam/netanim.git
+# 3. NetAnim 폴더로 이동
+cd netanim
+# 4. 컴파일 환경 세팅 및 빌드 (약 1~2분 소요됩니다)
+mkdir build
+cd build
+cmake ..
+make
+
+실행
+./netanim
+~/cpp_study/ns3/netanim/build/netanim
+
+차이점 : 원점 (0,0) 위치, Y값이 커지는 방향, 자동차의 움직임 순
+SUMO (수학/지도 좌표계)         :맵의 정중앙 (또는 왼쪽 아래), 위쪽 (북쪽, ↑), 남쪽(-100) ➡️ 북쪽(+100)으로 직진
+NetAnim / NS-3 (화면 좌표계)    :화면의 왼쪽 맨 위 (Top-Left), 아래쪽 (남쪽, ↓), 위쪽(-100) ➡️ 아래쪽(+100)으로 직진

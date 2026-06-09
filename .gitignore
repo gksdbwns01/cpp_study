@@ -1,2 +1,5 @@
-# ns-3 소스 전체 제외
-ns3/ns-3.48/
+ns3/ns-3.48/build/
+liboqs/
+*.so
+*.o
+*.a
