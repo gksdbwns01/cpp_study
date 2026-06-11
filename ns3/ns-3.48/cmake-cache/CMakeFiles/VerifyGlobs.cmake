@@ -9,6 +9,8 @@ set(OLD_GLOB
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/my_test.cc"
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/nested-subdir"
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/netedit01"
+  "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/osm_test"
+  "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/osm_test02"
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/p2p_test"
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/scratch-simulator.cc"
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/subdir"
@@ -33,6 +35,26 @@ endif()
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/netedit01/[^.]*.cc")
 set(OLD_GLOB
   "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/netedit01/vanet_test.cc"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/CMakeFiles/cmake.verify_globs")
+endif()
+
+# scratch_sources at scratch/CMakeLists.txt:98 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/osm_test/[^.]*.cc")
+set(OLD_GLOB
+  "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/osm_test/vanet_test.cc"
+  )
+if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
+  message("-- GLOB mismatch!")
+  file(TOUCH_NOCREATE "/home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/CMakeFiles/cmake.verify_globs")
+endif()
+
+# scratch_sources at scratch/CMakeLists.txt:98 (file)
+file(GLOB NEW_GLOB LIST_DIRECTORIES true "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/osm_test02/[^.]*.cc")
+set(OLD_GLOB
+  "/home/gksdbwns/cpp_study/ns3/ns-3.48/scratch/osm_test02/vanet_test.cc"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   message("-- GLOB mismatch!")

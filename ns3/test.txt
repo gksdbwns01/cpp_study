@@ -85,3 +85,6 @@ cd ~/cpp_study/ns3/ns-3.48
 ./ns3 run scratch/netedit01/vanet_test
 cd ~/cpp_study/ns3/netanim/build
 ./netanim
+
+프로젝트 폴더에 모두 넣었을 경우
+sumo-gui -n map.net.xml -r map.rou.xml

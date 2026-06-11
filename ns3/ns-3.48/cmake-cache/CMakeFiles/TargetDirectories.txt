@@ -958,6 +958,8 @@
 /home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_my_test.dir
 /home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_scratch-simulator.dir
 /home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_netedit01_vanet_test.dir
+/home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_osm_test_vanet_test.dir
+/home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_osm_test02_vanet_test.dir
 /home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_p2p_test_p2p_sim.dir
 /home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/scratch_subdir_scratch-subdir.dir
 /home/gksdbwns/cpp_study/ns3/ns-3.48/cmake-cache/scratch/CMakeFiles/edit_cache.dir
