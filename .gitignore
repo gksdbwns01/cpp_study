@@ -3,3 +3,4 @@ liboqs/
 *.so
 *.o
 *.a
+ns3/ns-3.48/osm-vanet-animation.xml
