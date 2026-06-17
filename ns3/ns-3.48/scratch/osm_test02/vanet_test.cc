@@ -12,7 +12,7 @@ using namespace ns3;
 int main (int argc, char *argv[])
 {
     // =========================================================
-    // [NEW] 출력 파일이 저장될 폴더 경로를 변수로 지정합니다.
+    // 출력 파일이 저장될 폴더 경로를 변수로 지정합니다.
     // =========================================================
     std::string outDir = "scratch/osm_test02/";
 
@@ -36,15 +36,15 @@ int main (int argc, char *argv[])
     phy.SetChannel(channel.Create());
 
     // =========================================================
-    // [수정됨] 비현실적인 RxGain 치트키 삭제! 
-    // 이제 NS-3의 기본 WAVE(802.11p) 스펙이 적용되어 현실적인 
-    // 통신 반경(약 150m) 안에서만 패킷이 전달됩니다.
+    // [수정 완료 1] 802.11p (차량용 통신) 표준 적용
+    // 비현실적인 RxGain 치트키를 삭제하고, WIFI_STANDARD_80211p를
+    // 명시하여 현실적인 통신 반경(약 150m 내외)을 갖도록 설정합니다.
     // =========================================================
-
     WifiMacHelper mac;
     mac.SetType("ns3::AdhocWifiMac"); 
 
     WifiHelper wifi;
+    wifi.SetStandard(WIFI_STANDARD_80211p); // ns-3.33 이상(ns-3.48 등) 최신 버전용 802.11p 표준 적용
     NetDeviceContainer devices = wifi.Install(phy, mac, realVehicles);
 
     InternetStackHelper internet;
@@ -55,22 +55,31 @@ int main (int argc, char *argv[])
     Ipv4InterfaceContainer interfaces = ipv4.Assign(devices);
 
     uint16_t port = 9;
-    UdpEchoServerHelper echoServer(port);
+
+    // =========================================================
+    // [수정 완료 2-1] 수신 전용 서버 (답장 안 함)
+    // UdpEchoServer 대신 일반 UdpServer를 사용하여 수신만 하도록 설정
+    // =========================================================
+    UdpServerHelper oneWayServer(port);
 
     for (uint32_t i = 0; i < realVehicles.GetN(); ++i) {
-        ApplicationContainer serverApps = echoServer.Install(realVehicles.Get(i));
+        ApplicationContainer serverApps = oneWayServer.Install(realVehicles.Get(i));
         serverApps.Start(Seconds(1.0));
         serverApps.Stop(Seconds(100.0));
     }
 
+    // =========================================================
+    // [수정 완료 2-2] 단방향 브로드캐스트 클라이언트
+    // UdpEchoClient 대신 일반 UdpClient를 사용하여 전송만 하도록 설정
+    // =========================================================
     Ipv4Address broadcastAddress("10.1.1.255"); 
     for (uint32_t i = 0; i < 5; ++i) { 
-        UdpEchoClientHelper echoClient(broadcastAddress, port);
-        echoClient.SetAttribute("MaxPackets", UintegerValue(100)); 
-        echoClient.SetAttribute("Interval", TimeValue(Seconds(1.0))); 
-        echoClient.SetAttribute("PacketSize", UintegerValue(1024));
+        UdpClientHelper oneWayClient(broadcastAddress, port);
+        oneWayClient.SetAttribute("MaxPackets", UintegerValue(100)); 
+        oneWayClient.SetAttribute("Interval", TimeValue(Seconds(1.0))); 
+        oneWayClient.SetAttribute("PacketSize", UintegerValue(1024));
 
-        ApplicationContainer clientApps = echoClient.Install(realVehicles.Get(i));
+        ApplicationContainer clientApps = oneWayClient.Install(realVehicles.Get(i));
         clientApps.Start(Seconds(2.0 + (i * 0.05)));
         clientApps.Stop(Seconds(100.0));
     }
@@ -83,7 +92,7 @@ int main (int argc, char *argv[])
     FlowMonitorHelper flowmonHelper;
     Ptr<FlowMonitor> monitor = flowmonHelper.InstallAll();
 
-    std::cout << "3. OSM 시뮬레이션 시작! (현실적 통신 반경 적용됨)" << std::endl;
+    std::cout << "3. OSM 시뮬레이션 시작! (현실적 통신 반경 및 단방향 브로드캐스트 적용됨)" << std::endl;
 
     Simulator::Stop(Seconds(100.0));
     Simulator::Run();
