@@ -88,3 +88,47 @@ cd ~/cpp_study/ns3/netanim/build
 
 프로젝트 폴더에 모두 넣었을 경우
 sumo-gui -n map.net.xml -r map.rou.xml
+
+Veins (OMNeT++ + SUMO) 통합 환경 구축
+sudo apt update && 
+sudo apt install -y build-essential clang lld gdb bison flex perl python3 python3-pip \
+qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libqt5opengl5-dev libxml2-dev \
+zlib1g-dev doxygen graphviz libwebkit2gtk-4.1-0
+sudo apt install -y sumo sumo-tools sumo-doc
+cd ~
+wget https://github.com/omnetpp/omnetpp/releases/download/omnetpp-6.0.3/omnetpp-6.0.3-linux-x86_64.tgz
+tar xvfz omnetpp-6.0.3-linux-x86_64.tgz
+sudo apt install -y python3-posix-ipc
+pip3 install posix_ipc --break-system-packages
+echo "WITH_OSG=no" >> configure.user
+echo "WITH_OSGEARTH=no" >> configure.user
+./configure
+make -j$(nproc)
+cd omnetpp-6.0.3
+source setenv
+sudo apt install -y xdg-utils
+make -j$(nproc)
+omnetpp
+cd ~
+sudo apt install -y unzip
+wget https://veins.car2x.org/download/veins-5.2.zip
+unzip veins-5.2.zip
+OMNeT++ IDE에서 Veins 불러오기:
+터미널에서 omnetpp
+상단 메뉴에서 File > Import 클릭.
+General > Existing Projects into Workspace 선택 후 'Next'.
+Select root directory에서 아까 압축을 푼 veins-5.2 폴더를 찾아 선택하고 'Finish'.
+Veins 프로젝트 빌드:
+IDE 왼쪽 패널(Project Explorer)에 veins 폴더가 생겼을 거야.
+해당 폴더를 우클릭하고 Build Project를 클릭해.
+에러 없이 완료되면 연동 준비 끝
+cd ~/veins-veins-5.2
+python3 bin/veins_launchd -vv -c sumo
+다시 캡처해서 보여준 OMNeT++ IDE 창으로 돌아가.
+왼쪽 Project Explorer에서 veins 폴더를 열고, examples 폴더 안에 있는 veins 폴더로 들어가 봐.
+거기에 omnetpp.ini 라는 설정 파일이 있을 거야.
+그 파일을 우클릭한 다음, Run As > OMNeT++ Simulation을 클릭해
+잠시 후 새로운 시각화 창(Qtenv)이 뜰 텐데, 창 왼쪽 상단의 재생(Play) 버튼을 누르면 시뮬레이션이 시작돼.
+환경변수
+echo "source ~/omnetpp-6.0.3/setenv" >> ~/.bashrc
+source ~/.bashrc
