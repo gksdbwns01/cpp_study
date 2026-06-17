@@ -41,10 +41,11 @@ int main (int argc, char *argv[])
     // 명시하여 현실적인 통신 반경(약 150m 내외)을 갖도록 설정합니다.
     // =========================================================
     WifiMacHelper mac;
+    // OcbWifiMac 대신 기존의 AdhocWifiMac을 그대로 사용합니다.
     mac.SetType("ns3::AdhocWifiMac"); 
 
     WifiHelper wifi;
-    wifi.SetStandard(WIFI_STANDARD_80211p); // ns-3.33 이상(ns-3.48 등) 최신 버전용 802.11p 표준 적용
+    wifi.SetStandard(WIFI_STANDARD_80211p);
     NetDeviceContainer devices = wifi.Install(phy, mac, realVehicles);
 
     InternetStackHelper internet;
@@ -72,9 +73,11 @@ int main (int argc, char *argv[])
     // [수정 완료 2-2] 단방향 브로드캐스트 클라이언트
     // UdpEchoClient 대신 일반 UdpClient를 사용하여 전송만 하도록 설정
     // =========================================================
-    Ipv4Address broadcastAddress("10.1.1.255"); 
+    // [수정됨] 브로드캐스트(10.1.1.255) 대신, 특정 목적지(예: 6번째 차량의 IP) 지정
+    // 10.1.1.0 네트워크에서 노드들은 10.1.1.1 부터 IP를 할당받으므로 10.1.1.6을 타겟으로 합니다.
+    Ipv4Address destAddress("10.1.1.6");
     for (uint32_t i = 0; i < 5; ++i) { 
-        UdpClientHelper oneWayClient(broadcastAddress, port);
+        UdpClientHelper oneWayClient(destAddress, port);
         oneWayClient.SetAttribute("MaxPackets", UintegerValue(100)); 
         oneWayClient.SetAttribute("Interval", TimeValue(Seconds(1.0))); 
         oneWayClient.SetAttribute("PacketSize", UintegerValue(1024));
