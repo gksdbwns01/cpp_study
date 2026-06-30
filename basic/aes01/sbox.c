@@ -320,54 +320,6 @@ void PrintHex(const char* label, const uint8_t* data, int length) { // 데이터
 }
 
 int main() {
-    // 프로그램 시작 시 S-box 배열을 수학적으로 생성
-    Generate_SBox();
-    printf("==========================================\n");
-    printf("     AES-128 클린 코드 리팩토링 테스트\n");
-    printf("==========================================\n");
-
-    uint8_t plaintext[AES_BLOCK_SIZE] = {
-        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
-        0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff
-    };
-
-    uint8_t key[AES_BLOCK_SIZE] = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
-    };
-
-    uint8_t ciphertext[AES_BLOCK_SIZE];
-    uint8_t decryptedtext[AES_BLOCK_SIZE];
-
-    uint8_t RoundKey[AES_ROUND_KEY_SIZE];
-
-    KeyExpansion(key, RoundKey);
-
-    PrintHex("Plaintext", plaintext, AES_BLOCK_SIZE);
-    PrintHex("Key", key, AES_BLOCK_SIZE);
-    printf("------------------------------------------\n");
-
-    Cipher(plaintext, RoundKey, ciphertext);
-    PrintHex("Ciphertext", ciphertext, AES_BLOCK_SIZE);
-    printf("(Expected CT : 69C4E0D86A7B0430D8CDB78070B4C55A)\n");
-    printf("------------------------------------------\n");
-
-    InvCipher(ciphertext, RoundKey, decryptedtext);
-    PrintHex("Decrypted", decryptedtext, AES_BLOCK_SIZE);
-
-    printf("==========================================\n");
-
-    if (memcmp(plaintext, decryptedtext, AES_BLOCK_SIZE) == 0) {
-        printf("[SUCCESS] 복호화된 데이터가 원본과 일치합니다!\n");
-    }
-    else {
-        printf("[FAIL] 복호화 데이터가 원본과 다릅니다.\n");
-    }
-
-    return 0;
-}
-
-int main() {
     // 프로그램 시작 시 S-box 배열을 생성
     Generate_SBox();
     
@@ -406,7 +358,7 @@ int main() {
     
     // 만들어진 암호문을 출력하고, 표준 문서의 정답(Expected CT)과 비교
     PrintHex("Ciphertext", ciphertext, AES_BLOCK_SIZE);
-    printf("(Expected CT : 69C4E0D86A7B0430D8CDB78070B4C55A)\n");
+    printf("(Expected CT: 69C4E0D86A7B0430D8CDB78070B4C55A)\n");
     printf("------------------------------------------\n");
 
 
