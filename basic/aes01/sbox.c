@@ -404,7 +404,7 @@ int main() {
     // 평문을 확장된 키로 암호화하여 암호문 배열에 저장
     Cipher(plaintext, RoundKey, ciphertext);
     
-    // 만들어진 암호문을 출력하고, 표준 문서의 정답(Expected CT)과 눈으로 비교
+    // 만들어진 암호문을 출력하고, 표준 문서의 정답(Expected CT)과 비교
     PrintHex("Ciphertext", ciphertext, AES_BLOCK_SIZE);
     printf("(Expected CT : 69C4E0D86A7B0430D8CDB78070B4C55A)\n");
     printf("------------------------------------------\n");
