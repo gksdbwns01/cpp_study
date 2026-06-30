@@ -1,4 +1,4 @@
-// AES 외부 라이브러리 없이 AES의 모든 수학적 과정을 직접 구현
+// AES. 외부 라이브러리 없이 AES의 모든 수학적 과정을 직접 구현
 
 #include <stdio.h>
 #include <stdint.h>
@@ -169,7 +169,7 @@ void KeyExpansion(const uint8_t* key, uint8_t* RoundKey) { // AES-128 키 확장
         RoundKey[i * 4 + 2] = RoundKey[(i - Nk) * 4 + 2] ^ temp[2];
         RoundKey[i * 4 + 3] = RoundKey[(i - Nk) * 4 + 3] ^ temp[3];
         
-        i++; // 다음 워드 생성으로 넘어감
+        i++;
     }
 }
 
@@ -326,7 +326,6 @@ int main() {
     printf("     AES-128 클린 코드 리팩토링 테스트\n");
     printf("==========================================\n");
 
-    // 매크로(AES_BLOCK_SIZE) 적용
     uint8_t plaintext[AES_BLOCK_SIZE] = {
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff
@@ -340,7 +339,6 @@ int main() {
     uint8_t ciphertext[AES_BLOCK_SIZE];
     uint8_t decryptedtext[AES_BLOCK_SIZE];
 
-    // 매크로(AES_ROUND_KEY_SIZE) 적용
     uint8_t RoundKey[AES_ROUND_KEY_SIZE];
 
     KeyExpansion(key, RoundKey);
