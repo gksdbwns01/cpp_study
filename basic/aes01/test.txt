@@ -1,3 +1,8 @@
 매직 넘버를 매크로 상수로 교체
 LoadState, StoreState 함수를 별도로 분리
 불필요한 배열 복사 로직 모듈화
+
+sbox : 무작위로 섞인 단순한 난수 배열이 아님
+S-box 내의 모든 256개 값(0x00 ~ 0xFF)은 "자신의 곱셈 역원을 구한 뒤, 특정 규칙으로 비트를 섞고(행렬 곱), 
+마지막에 0x63을 더하는(XOR) 수학 공식"의 결과물입니다. (0x63은 AES에서 정해진 수)-(MixColumns, InvMixColumns도)
+복호화에 사용되는 Inverse S-box는 이 과정의 역함수(Inverse Affine Transformation 적용 후 역원 계산)를 취하여 만들어집니다.
