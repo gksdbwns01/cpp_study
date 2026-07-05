@@ -190,7 +190,7 @@ void AES_KeyExpansion(const uint8_t* key, uint8_t* RoundKey) {
 
 // AES 상태 배열 조작 및 4가지 핵심 변환 (라운드 함수)
 
-// 1차원 배열을 4x4 상태 행렬로 변환. 열(Column) 우선 배치
+// 1차원 배열을 4x4 상태 행렬로 변환. 열우선 배치
 static void LoadState(uint8_t state[4][4], const uint8_t* input) {
     for (int r = 0; r < Nb; ++r) {
         for (int c = 0; c < Nb; ++c) {
@@ -235,13 +235,28 @@ static void AES_InvSubBytes(uint8_t state[4][4]) {
     }
 }
 
-// 4x4 상태 행렬의 각 행을 왼쪽으로 시프트
+// 4x4 상태 행렬의 각 행을 왼쪽으로 시프트, ppt에서 보기 편하도록
 static void AES_ShiftRows(uint8_t state[4][4]) {
     uint8_t temp;
-    temp = state[1][0]; state[1][0] = state[1][1]; state[1][1] = state[1][2]; state[1][2] = state[1][3]; state[1][3] = temp;
-    temp = state[2][0]; state[2][0] = state[2][2]; state[2][2] = temp;
-    temp = state[2][1]; state[2][1] = state[2][3]; state[2][3] = temp;
-    temp = state[3][3]; state[3][3] = state[3][2]; state[3][2] = state[3][1]; state[3][1] = state[3][0]; state[3][0] = temp;
+    // 첫 번째 행(state[0])은 회전하지 않으므로 생략
+    temp = state[1][0];
+    state[1][0] = state[1][1];
+    state[1][1] = state[1][2];
+    state[1][2] = state[1][3];
+    state[1][3] = temp;
+
+    temp = state[2][0];
+    state[2][0] = state[2][2];
+    state[2][2] = temp;
+    temp = state[2][1];
+    state[2][1] = state[2][3];
+    state[2][3] = temp;
+
+    temp = state[3][3];
+    state[3][3] = state[3][2];
+    state[3][2] = state[3][1];
+    state[3][1] = state[3][0];
+    state[3][0] = temp;
 }
 
 // 복호화용 오른쪽 시프트
