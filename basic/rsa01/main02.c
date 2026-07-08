@@ -431,7 +431,7 @@ int main() {
     printf("========== [ 순수 C 구현 RSA-CRT 시뮬레이션 ] ==========\n\n");
     
     // 이제 64비트는 물론, 512비트로 테스트하셔도 금방 실행됩니다!
-    int key_size = 64; 
+    int key_size = 512; 
     printf("[*] %d비트 RSA 키 생성 시작 (Trial Division 최적화 적용)...\n", key_size);
     RSA_GenerateKey(&key, key_size);
     printf("[+] 키 생성 완료!\n\n");
