@@ -9,14 +9,14 @@
 // [1] bigint.h & bigint.c (Big Integer 직접 구현)
 // ============================================================================
 
-#define MAX_WORDS 64 // 64 * 32bit = 2048bit 지원
+// [개선] 256 워드 = 8192 비트 지원 (최대 4096비트 RSA의 곱셈 버퍼용으로 충분히 확장)
+#define MAX_WORDS 256 
 
 typedef struct {
     uint32_t data[MAX_WORDS];
     int size; // 사용 중인 32비트 워드의 개수
 } BigInt;
 
-// 초기화 및 복사
 void BigInt_Init(BigInt* a) {
     memset(a->data, 0, sizeof(a->data));
     a->size = 0;
@@ -27,19 +27,16 @@ void BigInt_Copy(BigInt* dest, const BigInt* src) {
     dest->size = src->size;
 }
 
-// 상위 워드의 불필요한 0 제거 (연산 속도 최적화)
 void BigInt_Trim(BigInt* a) {
     while (a->size > 0 && a->data[a->size - 1] == 0) {
         a->size--;
     }
 }
 
-// 0 확인
 bool BigInt_IsZero(const BigInt* a) {
     return a->size == 0 || (a->size == 1 && a->data[0] == 0);
 }
 
-// 비교 연산자 (a > b: 1, a == b: 0, a < b: -1)
 int BigInt_Compare(const BigInt* a, const BigInt* b) {
     if (a->size > b->size) return 1;
     if (a->size < b->size) return -1;
@@ -50,7 +47,6 @@ int BigInt_Compare(const BigInt* a, const BigInt* b) {
     return 0;
 }
 
-// 덧셈 (포인터 Aliasing 방지를 위해 temp 임시 버퍼 사용)
 void BigInt_Add(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -58,6 +54,7 @@ void BigInt_Add(BigInt* res, const BigInt* a, const BigInt* b) {
     int max_size = (a->size > b->size) ? a->size : b->size;
     
     for (int i = 0; i < max_size || carry > 0; i++) {
+        if (i >= MAX_WORDS) break; // 안전 장치
         uint64_t sum = carry;
         if (i < a->size) sum += a->data[i];
         if (i < b->size) sum += b->data[i];
@@ -69,7 +66,6 @@ void BigInt_Add(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt_Copy(res, &temp);
 }
 
-// 뺄셈 (res = a - b, a >= b 가정)
 void BigInt_Sub(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -92,7 +88,6 @@ void BigInt_Sub(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt_Copy(res, &temp);
 }
 
-// 곱셈 (res = a * b)
 void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -102,20 +97,24 @@ void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
     }
     
     temp.size = a->size + b->size;
+    if (temp.size > MAX_WORDS) temp.size = MAX_WORDS; // 오버플로우 방지
+    
     for (int i = 0; i < a->size; i++) {
         uint64_t carry = 0;
         for (int j = 0; j < b->size; j++) {
+            if (i + j >= MAX_WORDS) break;
             uint64_t prod = (uint64_t)a->data[i] * b->data[j] + temp.data[i + j] + carry;
             temp.data[i + j] = (uint32_t)(prod & 0xFFFFFFFF);
             carry = prod >> 32;
         }
-        temp.data[i + b->size] = (uint32_t)carry;
+        if (i + b->size < MAX_WORDS) {
+            temp.data[i + b->size] = (uint32_t)carry;
+        }
     }
     BigInt_Trim(&temp);
     BigInt_Copy(res, &temp);
 }
 
-// 비트 시프트 연산 (Left)
 void BigInt_ShiftLeft1(BigInt* a) {
     if (BigInt_IsZero(a)) return;
     uint32_t carry = 0;
@@ -124,13 +123,12 @@ void BigInt_ShiftLeft1(BigInt* a) {
         a->data[i] = (a->data[i] << 1) | carry;
         carry = next_carry;
     }
-    if (carry > 0) {
+    if (carry > 0 && a->size < MAX_WORDS) {
         a->data[a->size] = carry;
         a->size++;
     }
 }
 
-// 나눗셈 및 나머지 (Knuth 알고리즘 없이 Shift 기반 구현)
 void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
     BigInt temp_q, temp_r;
     BigInt_Init(&temp_q);
@@ -168,7 +166,7 @@ void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
             BigInt sub_res;
             BigInt_Sub(&sub_res, &temp_r, b);
             BigInt_Copy(&temp_r, &sub_res);
-            temp_q.data[word_idx] |= (1 << bit_idx);
+            temp_q.data[word_idx] |= (1U << bit_idx);
         }
     }
     BigInt_Trim(&temp_q);
@@ -178,7 +176,6 @@ void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
     if (r) BigInt_Copy(r, &temp_r);
 }
 
-// 32비트 작은 수로 모듈러 연산 (Trial Division용)
 uint32_t BigInt_Mod_Small(const BigInt* a, uint32_t m) {
     uint64_t rem = 0;
     for (int i = a->size - 1; i >= 0; i--) {
@@ -218,7 +215,7 @@ void ModExp(BigInt* res, const BigInt* base, const BigInt* exp, const BigInt* mo
 }
 
 void ModInverse(BigInt* res, const BigInt* e, const BigInt* phi) {
-    BigInt t, newt, r, newr, q, temp, prod, next_t, dummy;
+    BigInt t, newt, r, newr, q, temp, prod, next_t;
     int t_sign = 1, newt_sign = 1;
     
     BigInt_Init(&t);
@@ -262,7 +259,11 @@ void ModInverse(BigInt* res, const BigInt* e, const BigInt* phi) {
 
 void Generate_Random_BigInt(BigInt* a, int bit_length) {
     BigInt_Init(a);
-    int words = bit_length / 32;
+    if (bit_length <= 0) return;
+    
+    int words = (bit_length + 31) / 32; // [개선] 32 배수가 아닌 비트수도 올림으로 계산
+    if (words > MAX_WORDS) words = MAX_WORDS;
+    
     for (int i = 0; i < words; i++) {
         uint32_t r1 = rand() & 0xFF;
         uint32_t r2 = rand() & 0xFF;
@@ -271,15 +272,25 @@ void Generate_Random_BigInt(BigInt* a, int bit_length) {
         a->data[i] = (r1 << 24) | (r2 << 16) | (r3 << 8) | r4;
     }
     a->size = words;
-    a->data[words - 1] |= (1 << 31); // 길이 보장
-    a->data[0] |= 1;                 // 홀수 보장
+    
+    // [개선] 지정된 비트 길이를 정확히 맞추기 위한 비트 마스킹
+    int rem = bit_length % 32;
+    if (rem != 0) {
+        uint32_t mask = (1U << rem) - 1;
+        a->data[words - 1] &= mask;              // 상위 불필요한 비트 클리어
+        a->data[words - 1] |= (1U << (rem - 1)); // 최상위 비트를 1로 강제
+    } else {
+        a->data[words - 1] |= (1U << 31);
+    }
+    
+    a->data[0] |= 1; // 홀수 보장
+    BigInt_Trim(a);
 }
 
 bool MillerRabin(const BigInt* n, int k) {
-    if (BigInt_IsZero(n) || (n->size == 1 && n->data[0] == 1)) return false;
-    if ((n->data[0] & 1) == 0) return false; 
+    if (BigInt_IsZero(n) || (n->size == 1 && n->data[0] <= 1)) return false;
+    if ((n->data[0] & 1) == 0) return (n->size == 1 && n->data[0] == 2); 
     
-    // [버그 수정 완료] - n_minus_1을 계산할 때 독립된 변수 one을 사용하도록 수정
     BigInt n_minus_1, d, one;
     BigInt_Init(&one); one.data[0] = 1; one.size = 1;
     BigInt_Sub(&n_minus_1, n, &one);
@@ -298,8 +309,19 @@ bool MillerRabin(const BigInt* n, int k) {
     BigInt a, x, temp, dummy;
     for (int i = 0; i < k; i++) {
         BigInt_Init(&a);
-        a.data[0] = 2 + (rand() % 100); 
-        a.size = 1;
+        
+        // [개선] 2 ~ n-2 사이의 무작위 베이스(a) 생성
+        int bits_n = (n->size - 1) * 32;
+        uint32_t top = n->data[n->size - 1];
+        while (top) { bits_n++; top >>= 1; }
+        
+        Generate_Random_BigInt(&a, bits_n - 1); // n보다 한 비트 작은 랜덤수 생성
+        
+        // 생성된 a가 1 이하인 경우 안전하게 2 이상으로 보정
+        if (BigInt_IsZero(&a) || (a.size == 1 && a.data[0] <= 1)) {
+            a.data[0] = 2 + (rand() % 100);
+            a.size = 1;
+        }
         
         ModExp(&x, &a, &d, n);
         
@@ -338,13 +360,9 @@ void Generate_Prime(BigInt* p, int bit_length) {
         }
         if (divisible) continue; 
         
-        // [안전 장치 추가] 64비트 등 작은 키 생성 시, (p-1)이 65537과 서로소가 아니면 개인키 생성이 불가능하므로 차단
         if (BigInt_Mod_Small(p, 65537) == 1) continue;
         
-        // printf("."); 
-        // fflush(stdout);
-        
-        if (MillerRabin(p, 5)) {
+        if (MillerRabin(p, 5)) { // 정확도를 위해 k값을 늘려도 좋습니다.
             break;
         }
     }
@@ -365,7 +383,16 @@ void RSA_GenerateKey(RSA_Key* key, int total_bits) {
     BigInt dummy_q;
     
     printf("  [p 탐색] "); Generate_Prime(&key->p, prime_bits); printf(" 완료\n");
-    printf("  [q 탐색] "); Generate_Prime(&key->q, prime_bits); printf(" 완료\n");
+    
+    // [개선] p와 q가 동일하게 생성될 경우 재탐색
+    do {
+        printf("  [q 탐색] "); Generate_Prime(&key->q, prime_bits); 
+        if (BigInt_Compare(&key->p, &key->q) == 0) {
+            printf(" (p와 중복 발생, 재탐색 진행)\n");
+        } else {
+            printf(" 완료\n");
+        }
+    } while (BigInt_Compare(&key->p, &key->q) == 0);
     
     if (BigInt_Compare(&key->p, &key->q) < 0) {
         BigInt temp;
@@ -417,11 +444,11 @@ void RSA_Decrypt_CRT(BigInt* M, const BigInt* C, const RSA_Key* key) {
     BigInt_Add(M, &m2, &temp);
 }
 
+
 // ============================================================================
 // [5] main.c (전체 로직 검증 및 실행 파이프라인)
 // ============================================================================
 
-// Helper: BigInt의 전체 값을 출력하는 함수 추가
 void BigInt_Print(const BigInt* a) {
     if (BigInt_IsZero(a)) {
         printf("00000000");
@@ -438,18 +465,16 @@ int main() {
     RSA_Key key;
     BigInt plaintext, ciphertext, decrypted;
     
-    printf("========== [ 순수 C 구현 RSA-CRT 시뮬레이션 ] ==========\n\n");
+    printf("========== [ 순수 C 구현 RSA-CRT 시뮬레이션 (최적화 완료) ] ==========\n\n");
     
-    int key_size = 512; 
+    int key_size = 2048; // 1024비트로 변경 시 연산 시간에 주의하세요.
     printf("%d비트 RSA 키 생성 시작...\n", key_size);
     RSA_GenerateKey(&key, key_size);
-    printf("키 생성 완료!\n\n");
+    printf("\n키 생성 완료!\n\n");
     
-    // 전체 값 출력으로 변경
     printf("- p :\n"); BigInt_Print(&key.p); printf("\n\n");
     printf("- q :\n"); BigInt_Print(&key.q); printf("\n\n");
     printf("- 오일러 파이(phi) :\n"); BigInt_Print(&key.phi); printf("\n\n");
-    // 공개키/개인키 출력
     printf("- 모듈러스(n) :\n"); BigInt_Print(&key.n); printf("\n\n");
     printf("- 공개키(e) :\n"); BigInt_Print(&key.e); printf("\n\n");
     printf("- 개인키(d) :\n"); BigInt_Print(&key.d); printf("\n\n\n");
