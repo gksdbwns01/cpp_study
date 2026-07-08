@@ -431,48 +431,7 @@ void BigInt_Print(const BigInt* a) {
 // ============================================================================
 // [5] main.c (전체 로직 검증 및 실행 파이프라인)
 // ============================================================================
-/*
-int main() {
-    srand((unsigned int)time(NULL));
-    
-    RSA_Key key;
-    BigInt plaintext, ciphertext, decrypted;
-    
-    printf("========== [ 순수 C 구현 RSA-CRT 시뮬레이션 ] ==========\n\n");
-    
-    // 이제 64비트는 물론, 512비트로 테스트하셔도 금방 실행됩니다!
-    int key_size = 512; 
-    printf("[*] %d비트 RSA 키 생성 시작 (Trial Division 최적화 적용)...\n", key_size);
-    RSA_GenerateKey(&key, key_size);
-    printf("[+] 키 생성 완료!\n\n");
-    
-    
-    printf("- p (상위 워드)   : %08X...\n", key.p.data[key.p.size - 1]);
-    printf("- q (상위 워드)   : %08X...\n", key.q.data[key.q.size - 1]);
-    printf("- n (모듈러)      : %08X... (Size: %d words)\n\n", key.n.data[key.n.size - 1], key.n.size);
-    
-    BigInt_Init(&plaintext);
-    plaintext.data[0] = 0x48454C4C; // HELL
-    plaintext.data[1] = 0x0000004F; // O
-    plaintext.size = 2;
-    
-    printf("[*] 원본 평문 (M) : %08X %08X\n", plaintext.data[1], plaintext.data[0]);
-    
-    RSA_Encrypt(&ciphertext, &plaintext, &key);
-    printf("[+] 암호화 완료 (C) : %08X...\n", ciphertext.data[ciphertext.size - 1]);
-    
-    RSA_Decrypt_CRT(&decrypted, &ciphertext, &key);
-    printf("[+] 복호화 완료 (M) : %08X %08X\n\n", decrypted.data[1], decrypted.data[0]);
-    
-    if (BigInt_Compare(&plaintext, &decrypted) == 0) {
-        printf("[SUCCESS] CRT 기반 수학적 RSA 암복호화가 완벽히 일치합니다.\n");
-    } else {
-        printf("[FAILED] 연산 무결성 검증 실패.\n");
-    }
 
-    return 0;
-}
-*/
 int main() {
     srand((unsigned int)time(NULL));
     
