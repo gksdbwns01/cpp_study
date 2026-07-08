@@ -356,20 +356,9 @@ void Generate_Prime(BigInt* p, int bit_length) {
 // ============================================================================
 
 typedef struct {
-    BigInt p, q, n, e, d;
+    BigInt p, q, n, e, d, phi;
     BigInt dp, dq, qInv; 
 } RSA_Key;
-
-// Helper: BigInt의 전체 값을 출력하는 함수 추가
-void BigInt_Print(const BigInt* a) {
-    if (BigInt_IsZero(a)) {
-        printf("00000000");
-        return;
-    }
-    for (int i = a->size - 1; i >= 0; i--) {
-        printf("%08X", a->data[i]);
-    }
-}
 
 void RSA_GenerateKey(RSA_Key* key, int total_bits) {
     int prime_bits = total_bits / 2;
@@ -387,18 +376,15 @@ void RSA_GenerateKey(RSA_Key* key, int total_bits) {
     
     BigInt_Mul(&key->n, &key->p, &key->q);
     
-    BigInt p_minus_1, q_minus_1, phi, one;
+    BigInt p_minus_1, q_minus_1, one;
     BigInt_Init(&one); one.data[0] = 1; one.size = 1;
     
     BigInt_Sub(&p_minus_1, &key->p, &one);
     BigInt_Sub(&q_minus_1, &key->q, &one);
-    BigInt_Mul(&phi, &p_minus_1, &q_minus_1);
-    
-    // 오일러 파이 출력
-    // printf("- φ(n) (전체) : "); BigInt_Print(&phi); printf("\n");
+    BigInt_Mul(&key->phi, &p_minus_1, &q_minus_1);
     
     BigInt_Init(&key->e); key->e.data[0] = 65537; key->e.size = 1;
-    ModInverse(&key->d, &key->e, &phi);
+    ModInverse(&key->d, &key->e, &key->phi);
     
     BigInt_DivMod(&dummy_q, &key->dp, &key->d, &p_minus_1);
     BigInt_DivMod(&dummy_q, &key->dq, &key->d, &q_minus_1);
@@ -435,6 +421,17 @@ void RSA_Decrypt_CRT(BigInt* M, const BigInt* C, const RSA_Key* key) {
 // [5] main.c (전체 로직 검증 및 실행 파이프라인)
 // ============================================================================
 
+// Helper: BigInt의 전체 값을 출력하는 함수 추가
+void BigInt_Print(const BigInt* a) {
+    if (BigInt_IsZero(a)) {
+        printf("00000000");
+        return;
+    }
+    for (int i = a->size - 1; i >= 0; i--) {
+        printf("%08X", a->data[i]);
+    }
+}
+
 int main() {
     srand((unsigned int)time(NULL));
     
@@ -451,11 +448,11 @@ int main() {
     // 전체 값 출력으로 변경
     printf("- p :\n"); BigInt_Print(&key.p); printf("\n\n");
     printf("- q :\n"); BigInt_Print(&key.q); printf("\n\n");
-
+    printf("- 오일러 파이(phi) :\n"); BigInt_Print(&key.phi); printf("\n\n");
     // 공개키/개인키 출력
+    printf("- 모듈러스(n) :\n"); BigInt_Print(&key.n); printf("\n\n");
     printf("- 공개키(e) :\n"); BigInt_Print(&key.e); printf("\n\n");
-    printf("- 개인키(d) :\n"); BigInt_Print(&key.d); printf("\n\n");
-    printf("- 모듈러스(n) :\n"); BigInt_Print(&key.n); printf("\n\n\n");
+    printf("- 개인키(d) :\n"); BigInt_Print(&key.d); printf("\n\n\n");
     
     BigInt_Init(&plaintext);
     plaintext.data[0] = 0x48454C4C; 
