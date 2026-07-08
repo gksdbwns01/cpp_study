@@ -360,6 +360,17 @@ typedef struct {
     BigInt dp, dq, qInv; 
 } RSA_Key;
 
+// Helper: BigInt의 전체 값을 출력하는 함수 추가
+void BigInt_Print(const BigInt* a) {
+    if (BigInt_IsZero(a)) {
+        printf("00000000");
+        return;
+    }
+    for (int i = a->size - 1; i >= 0; i--) {
+        printf("%08X", a->data[i]);
+    }
+}
+
 void RSA_GenerateKey(RSA_Key* key, int total_bits) {
     int prime_bits = total_bits / 2;
     BigInt dummy_q;
@@ -382,6 +393,9 @@ void RSA_GenerateKey(RSA_Key* key, int total_bits) {
     BigInt_Sub(&p_minus_1, &key->p, &one);
     BigInt_Sub(&q_minus_1, &key->q, &one);
     BigInt_Mul(&phi, &p_minus_1, &q_minus_1);
+    
+    // 오일러 파이 출력
+    // printf("- φ(n) (전체) : "); BigInt_Print(&phi); printf("\n");
     
     BigInt_Init(&key->e); key->e.data[0] = 65537; key->e.size = 1;
     ModInverse(&key->d, &key->e, &phi);
@@ -417,17 +431,6 @@ void RSA_Decrypt_CRT(BigInt* M, const BigInt* C, const RSA_Key* key) {
     BigInt_Add(M, &m2, &temp);
 }
 
-// Helper: BigInt의 전체 값을 출력하는 함수 추가
-void BigInt_Print(const BigInt* a) {
-    if (BigInt_IsZero(a)) {
-        printf("00000000");
-        return;
-    }
-    for (int i = a->size - 1; i >= 0; i--) {
-        printf("%08X", a->data[i]);
-    }
-}
-
 // ============================================================================
 // [5] main.c (전체 로직 검증 및 실행 파이프라인)
 // ============================================================================
@@ -441,27 +444,31 @@ int main() {
     printf("========== [ 순수 C 구현 RSA-CRT 시뮬레이션 ] ==========\n\n");
     
     int key_size = 512; 
-    printf("[*] %d비트 RSA 키 생성 시작...\n", key_size);
+    printf("%d비트 RSA 키 생성 시작...\n", key_size);
     RSA_GenerateKey(&key, key_size);
-    printf("[+] 키 생성 완료!\n\n");
+    printf("키 생성 완료!\n\n");
     
     // 전체 값 출력으로 변경
-    printf("- p (전체) : "); BigInt_Print(&key.p); printf("\n");
-    printf("- q (전체) : "); BigInt_Print(&key.q); printf("\n");
-    printf("- n (전체) : "); BigInt_Print(&key.n); printf("\n\n");
+    printf("- p :\n"); BigInt_Print(&key.p); printf("\n\n");
+    printf("- q :\n"); BigInt_Print(&key.q); printf("\n\n");
+
+    // 공개키/개인키 출력
+    printf("- 공개키(e) :\n"); BigInt_Print(&key.e); printf("\n\n");
+    printf("- 개인키(d) :\n"); BigInt_Print(&key.d); printf("\n\n");
+    printf("- 모듈러스(n) :\n"); BigInt_Print(&key.n); printf("\n\n\n");
     
     BigInt_Init(&plaintext);
     plaintext.data[0] = 0x48454C4C; 
     plaintext.data[1] = 0x0000004F; 
-    plaintext.size = 2;
+    plaintext.size = 2; // HELLO를 32비트 단위로 저장
     
-    printf("[*] 원본 평문 (M) : "); BigInt_Print(&plaintext); printf("\n");
+    printf("원본 평문 (M) :\n"); BigInt_Print(&plaintext); printf("\n");
     
     RSA_Encrypt(&ciphertext, &plaintext, &key);
-    printf("[+] 암호화 완료 (C) : "); BigInt_Print(&ciphertext); printf("\n");
+    printf("암호화 완료 (C) :\n"); BigInt_Print(&ciphertext); printf("\n");
     
     RSA_Decrypt_CRT(&decrypted, &ciphertext, &key);
-    printf("[+] 복호화 완료 (M) : "); BigInt_Print(&decrypted); printf("\n\n");
+    printf("복호화 완료 (M) :\n"); BigInt_Print(&decrypted); printf("\n\n");
     
     if (BigInt_Compare(&plaintext, &decrypted) == 0) {
         printf("[SUCCESS] CRT 기반 수학적 RSA 암복호화가 완벽히 일치합니다.\n");
