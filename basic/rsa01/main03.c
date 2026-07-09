@@ -201,35 +201,39 @@ uint32_t BigInt_Mod_Small(const BigInt* a, uint32_t m) {
     return (uint32_t)rem; // 최종 나머지를 32비트로 캐스팅하여 반환
 }
 
-
 // ============================================================================
 // [2] rsa_math.c (모듈러 연산 및 확장 유클리드)
 // ============================================================================
 
+// 모듈러 거듭제곱 함수
+// Exponentiation by squaring (Square-and-Multiply) 방식 사용하여 효율적으로 계산
 void ModExp(BigInt* res, const BigInt* base, const BigInt* exp, const BigInt* mod) {
     BigInt b, e, temp, dummy_q;
-    BigInt_Copy(&b, base);
-    BigInt_Copy(&e, exp);
+    BigInt_Copy(&b, base); // 밑(base) 변수 초기화
+    BigInt_Copy(&e, exp); // 지수(exp) 변수 초기화
     
     BigInt_Init(res);
-    res->data[0] = 1; res->size = 1;
+    res->data[0] = 1; res->size = 1; // 결과값을 1로 초기화 (곱셈의 항등원)
     
-    while (!BigInt_IsZero(&e)) {
-        if (e.data[0] & 1) {
-            BigInt_Mul(&temp, res, &b);
-            BigInt_DivMod(&dummy_q, res, &temp, mod);
+    while (!BigInt_IsZero(&e)) { // 지수가 0이 될 때까지 반복
+        if (e.data[0] & 1) { // 지수의 최하위 비트가 1이면 (홀수면)
+            BigInt_Mul(&temp, res, &b); // 현재까지의 결과에 밑을 곱함
+            BigInt_DivMod(&dummy_q, res, &temp, mod); // 모듈러 연산, 결과값 제한
         }
-        BigInt_Mul(&temp, &b, &b);
-        BigInt_DivMod(&dummy_q, &b, &temp, mod);
+        BigInt_Mul(&temp, &b, &b); // 밑을 스스로 곱하여 제곱
+        BigInt_DivMod(&dummy_q, &b, &temp, mod);  // 밑에 대해 모듈러 연산 수행
         
+        // 지수를 오른쪽으로 1비트 시프트 (e = e / 2)
         for (int i = 0; i < e.size; i++) {
+            // 상위 워드에서 넘어올 비트 계산 (최상위 워드는 0이 들어옴)
             uint32_t carry = (i == e.size - 1) ? 0 : (e.data[i + 1] & 1) << 31;
-            e.data[i] = (e.data[i] >> 1) | carry;
+            e.data[i] = (e.data[i] >> 1) | carry; // 상위에서 넘어온 비트 삽입
         }
-        BigInt_Trim(&e);
+        BigInt_Trim(&e); // 불필요한 0 제거
     }
 }
 
+// 모듈러 역원 함수(확장 유클리드 알고리즘)
 void ModInverse(BigInt* res, const BigInt* e, const BigInt* phi) {
     BigInt t, newt, r, newr, q, temp, prod, next_t;
     int t_sign = 1, newt_sign = 1;
@@ -268,19 +272,20 @@ void ModInverse(BigInt* res, const BigInt* e, const BigInt* phi) {
     else BigInt_Copy(res, &t);
 }
 
-
 // ============================================================================
 // [3] random.h & random.c (난수 및 소수 판별)
 // ============================================================================
 
+// 지정된 비트 길이의 랜덤 BigInt 생성
 void Generate_Random_BigInt(BigInt* a, int bit_length) {
     BigInt_Init(a);
     if (bit_length <= 0) return;
     
-    int words = (bit_length + 31) / 32; // [개선] 32 배수가 아닌 비트수도 올림으로 계산
+    // 필요한 32비트 워드 개수 올림하여 계산
+    int words = (bit_length + 31) / 32; // 32 배수가 아닌 비트수도 올림으로 계산
     if (words > MAX_WORDS) words = MAX_WORDS;
     
-    for (int i = 0; i < words; i++) {
+    for (int i = 0; i < words; i++) { // 워드 개수만큼 난수 생성하여 채워넣음
         uint32_t r1 = rand() & 0xFF;
         uint32_t r2 = rand() & 0xFF;
         uint32_t r3 = rand() & 0xFF;
@@ -289,118 +294,138 @@ void Generate_Random_BigInt(BigInt* a, int bit_length) {
     }
     a->size = words;
     
-    // [개선] 지정된 비트 길이를 정확히 맞추기 위한 비트 마스킹
+    // 지정된 비트 길이를 정확히 맞추기 위한 비트 마스킹
     int rem = bit_length % 32;
     if (rem != 0) {
         uint32_t mask = (1U << rem) - 1;
-        a->data[words - 1] &= mask;              // 상위 불필요한 비트 클리어
-        a->data[words - 1] |= (1U << (rem - 1)); // 최상위 비트를 1로 강제
+        a->data[words - 1] &= mask; // 상위 불필요한 비트 클리어
+        a->data[words - 1] |= (1U << (rem - 1)); // 최상위 비트를 1로 설정
     } else {
-        a->data[words - 1] |= (1U << 31);
+        a->data[words - 1] |= (1U << 31); // 나머지가 0(정확히 32배수)인 경우 최상위 워드의 31번째 비트를 1로 세팅
     }
     
-    a->data[0] |= 1; // 홀수 보장
+    a->data[0] |= 1; // 홀수 보장 (짝수는 2빼고 모두 합성수)
     BigInt_Trim(a);
 }
 
+// 밀러-라빈 (Miller-Rabin) 소수 판별법. 소수일 확률이 높은 수인지 k번 검사 (true: 확률적 소수, false: 합성수)
+// 압도적인 속도와 높은 정확도를 제공. k값을 늘리면 정확도는 더 높아짐
 bool MillerRabin(const BigInt* n, int k) {
+    // 0, 1은 소수가 아님
     if (BigInt_IsZero(n) || (n->size == 1 && n->data[0] <= 1)) return false;
+    // 짝수인 경우 2일때만 소수고 나머지는 합성수
     if ((n->data[0] & 1) == 0) return (n->size == 1 && n->data[0] == 2); 
     
     BigInt n_minus_1, d, one;
     BigInt_Init(&one); one.data[0] = 1; one.size = 1;
-    BigInt_Sub(&n_minus_1, n, &one);
+    BigInt_Sub(&n_minus_1, n, &one); // n - 1 계산
     
     BigInt_Copy(&d, &n_minus_1);
     int s = 0;
+    // n - 1 을 d * 2^s 형태로 분해 (d가 홀수가 될 때까지 2로 계속 나눔)
     while ((d.data[0] & 1) == 0 && !BigInt_IsZero(&d)) {
+        // d를 오른쪽으로 1비트 시프트 (d = d / 2)
         for (int i = 0; i < d.size; i++) {
             uint32_t carry = (i == d.size - 1) ? 0 : (d.data[i + 1] & 1) << 31;
             d.data[i] = (d.data[i] >> 1) | carry;
         }
         BigInt_Trim(&d);
-        s++;
+        s++; // 2로 나눈 횟수 증가
     }
     
     BigInt a, x, temp, dummy;
+    // k번 만큼 베이스를 바꿔가며 테스트 반복
     for (int i = 0; i < k; i++) {
         BigInt_Init(&a);
         
-        // [개선] 2 ~ n-2 사이의 무작위 베이스(a) 생성
+        // 2 ~ n-2 사이의 무작위 베이스(a) 생성 준비
         int bits_n = (n->size - 1) * 32;
         uint32_t top = n->data[n->size - 1];
         while (top) { bits_n++; top >>= 1; }
         
-        Generate_Random_BigInt(&a, bits_n - 1); // n보다 한 비트 작은 랜덤수 생성
+        Generate_Random_BigInt(&a, bits_n - 1); // n보다 한 비트 작은 길이로 무작위 수(a) 생성
         
-        // 생성된 a가 1 이하인 경우 안전하게 2 이상으로 보정
+        // 생성된 a가 0이나 1이면 밀러라빈 테스트에 무의미하므로 2 이상으로 보정
         if (BigInt_IsZero(&a) || (a.size == 1 && a.data[0] <= 1)) {
             a.data[0] = 2 + (rand() % 100);
             a.size = 1;
         }
         
+        // x = a^d mod n 계산
         ModExp(&x, &a, &d, n);
         
+        // x == 1 이거나 x == n-1 이면 이 베이스(a)에 대해서는 소수일 가능성 통과
         if (x.size == 1 && x.data[0] == 1) continue;
         if (BigInt_Compare(&x, &n_minus_1) == 0) continue;
         
-        bool composite = true;
-        for (int j = 0; j < s - 1; j++) {
-            BigInt_Mul(&temp, &x, &x);
-            BigInt_DivMod(&dummy, &x, &temp, n);
+        bool composite = true; // 일단 합성수로 가정
+        for (int j = 0; j < s - 1; j++) { // s-1 번 동안 x를 제곱해가며 검사
+            BigInt_Mul(&temp, &x, &x);            // x = x^2
+            BigInt_DivMod(&dummy, &x, &temp, n);  // x = (x^2) % n
             
+            // 제곱한 값이 1이면 중간에 n-1이 나오지 않은 것이므로 합성수 판정 확정
             if (x.size == 1 && x.data[0] == 1) return false; 
+            // 제곱한 값이 n-1이 나오면 해당 베이스에 대해 통과, 반복 중단
             if (BigInt_Compare(&x, &n_minus_1) == 0) {
                 composite = false;
                 break;
             }
         }
+        // 위 루프에서 소수 가능성을 찾지 못했다면 합성수 반환
         if (composite) return false;
     }
+    // k번의 테스트를 모두 통과했다면 매우 높은 확률로 소수로 판정
     return true;
 }
 
+// 지정된 비트 길이의 큰 소수를 생성
 void Generate_Prime(BigInt* p, int bit_length) {
+    // 밀러라빈 테스트 전, 연산 속도 향상을 위해 작은 소수들로 먼저 걸러내기 위한 배열
+    // 합성수 방어1 : 작은 소수 검사
     const uint32_t small_primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
     int num_primes = sizeof(small_primes) / sizeof(small_primes[0]);
     
-    while (1) {
-        Generate_Random_BigInt(p, bit_length);
+    while (1) { // 소수를 찾을 때까지
+        Generate_Random_BigInt(p, bit_length); // 해당 비트 길이의 무작위 홀수 생성
         
         bool divisible = false;
-        for (int i = 0; i < num_primes; i++) {
+        for (int i = 0; i < num_primes; i++) { // 작은 소수들로 나누어 떨어지는지 검사
             if (BigInt_Mod_Small(p, small_primes[i]) == 0) {
-                divisible = true;
+                divisible = true; // 나누어 떨어지면 합성수
                 break;
             }
         }
         if (divisible) continue; 
         
+        // 합성수 방어2 : 65537 검사
+        // RSA 공개키(e=65537) 생성 시 문제가 발생하지 않도록, p를 65537로 나눈 나머지가 1이면 배제
         if (BigInt_Mod_Small(p, 65537) == 1) continue;
         
-        if (MillerRabin(p, 5)) { // 정확도를 위해 k값을 늘려도 좋습니다.
+        // // 합성수 방어3 : 테스트 n회 진행
+        if (MillerRabin(p, 5)) { // 정확도를 위해 k값을 늘릴 수 있음
             break;
         }
     }
 }
 
-
 // ============================================================================
 // [4] rsa.h & rsa.c (RSA 키 생성 및 암복호화)
 // ============================================================================
 
+// RSA 키 묶음을 저장하기 위한 구조체 정의
 typedef struct {
     BigInt p, q, n, e, d, phi;
-    BigInt dp, dq, qInv; 
+    BigInt dp, dq, qInv; // CRT 최적화 복호화를 위한 요소 (dp = d mod (p-1), dq = d mod (q-1), qInv = q^-1 mod p)
 } RSA_Key;
 
+// 전체 키 비트수를 입력받아 RSA 키 쌍을 생성
 void RSA_GenerateKey(RSA_Key* key, int total_bits) {
-    int prime_bits = total_bits / 2;
+    int prime_bits = total_bits / 2; // p와 q는 각각 전체 키 크기의 절반
     BigInt dummy_q;
     
-    printf("  [p 탐색] "); Generate_Prime(&key->p, prime_bits); printf(" 완료\n");
+    printf("  [p 탐색] "); Generate_Prime(&key->p, prime_bits); printf(" 완료\n"); // 소수 p 생성
     
-    // [개선] p와 q가 동일하게 생성될 경우 재탐색
+    // p와 q가 동일하게 생성될 경우 재탐색
     do {
         printf("  [q 탐색] "); Generate_Prime(&key->q, prime_bits); 
         if (BigInt_Compare(&key->p, &key->q) == 0) {
@@ -410,6 +435,7 @@ void RSA_GenerateKey(RSA_Key* key, int total_bits) {
         }
     } while (BigInt_Compare(&key->p, &key->q) == 0);
     
+    // CRT 복호화 연산에서 뺄셈 시 음수 방지를 위해 p가 항상 q보다 크도록 교환
     if (BigInt_Compare(&key->p, &key->q) < 0) {
         BigInt temp;
         BigInt_Copy(&temp, &key->p);
@@ -417,54 +443,61 @@ void RSA_GenerateKey(RSA_Key* key, int total_bits) {
         BigInt_Copy(&key->q, &temp);
     }
     
-    BigInt_Mul(&key->n, &key->p, &key->q);
+    BigInt_Mul(&key->n, &key->p, &key->q); // 모듈러스 N 생성 (n = p * q)
     
-    BigInt p_minus_1, q_minus_1, one;
+    BigInt p_minus_1, q_minus_1, one; // 오일러 파이 생성 
     BigInt_Init(&one); one.data[0] = 1; one.size = 1;
-    
     BigInt_Sub(&p_minus_1, &key->p, &one);
     BigInt_Sub(&q_minus_1, &key->q, &one);
-    BigInt_Mul(&key->phi, &p_minus_1, &q_minus_1);
+    BigInt_Mul(&key->phi, &p_minus_1, &q_minus_1); // phi(n) = (p-1) * (q-1)
     
-    BigInt_Init(&key->e); key->e.data[0] = 65537; key->e.size = 1;
-    ModInverse(&key->d, &key->e, &key->phi);
+    BigInt_Init(&key->e); key->e.data[0] = 65537; key->e.size = 1; // 공개키 e: 가장 널리 쓰이는 65537
+    ModInverse(&key->d, &key->e, &key->phi); // 개인키 d 생성 (d = e^-1 mod phi)
     
-    BigInt_DivMod(&dummy_q, &key->dp, &key->d, &p_minus_1);
-    BigInt_DivMod(&dummy_q, &key->dq, &key->d, &q_minus_1);
-    ModInverse(&key->qInv, &key->q, &key->p);
+    // CRT 기반 고속 복호화에 필요한 파라미터 계산
+    BigInt_DivMod(&dummy_q, &key->dp, &key->d, &p_minus_1); // dp = d % (p - 1)
+    BigInt_DivMod(&dummy_q, &key->dq, &key->d, &q_minus_1); // dq = d % (q - 1)
+    ModInverse(&key->qInv, &key->q, &key->p); // qInv = q^-1 mod p
 }
 
+// RSA 암호화 함수 (C = M^e mod N)
 void RSA_Encrypt(BigInt* C, const BigInt* M, const RSA_Key* key) {
     ModExp(C, M, &key->e, &key->n);
 }
 
+// CRT기반 초고속 RSA 복호화 함수
 void RSA_Decrypt_CRT(BigInt* M, const BigInt* C, const RSA_Key* key) {
     BigInt m1, m2, h, temp, dummy_q;
     
-    ModExp(&m1, C, &key->dp, &key->p);
-    ModExp(&m2, C, &key->dq, &key->q);
+    // 1. 작은 지수와 모듈러스를 이용해 각각 복호화
+    ModExp(&m1, C, &key->dp, &key->p); // m1 = C^dp mod p
+    ModExp(&m2, C, &key->dq, &key->q); // m2 = C^dq mod q
     
+    // 2. Garner의 알고리즘을 이용해 두 결과 결합 (M = m2 + h * q)
     BigInt diff;
+    // (m1 - m2) 연산 시 m1이 m2보다 작아 음수가 되는 것을 방지하기 위해 p를 더해줌
     if (BigInt_Compare(&m1, &m2) < 0) {
         BigInt m1_plus_p;
-        BigInt_Add(&m1_plus_p, &m1, &key->p);
-        BigInt_Sub(&diff, &m1_plus_p, &m2);
+        BigInt_Add(&m1_plus_p, &m1, &key->p); // m1 + p
+        BigInt_Sub(&diff, &m1_plus_p, &m2); // (m1 + p) - m2
     } else {
-        BigInt_Sub(&diff, &m1, &m2);
+        BigInt_Sub(&diff, &m1, &m2); // m1 - m2
     }
     
-    BigInt_Mul(&temp, &key->qInv, &diff);
-    BigInt_DivMod(&dummy_q, &h, &temp, &key->p);
+    // h = (qInv * (m1 - m2)) mod p 계산
+    BigInt_Mul(&temp, &key->qInv, &diff); // temp = qInv * diff
+    BigInt_DivMod(&dummy_q, &h, &temp, &key->p); // h = temp % p
     
-    BigInt_Mul(&temp, &h, &key->q);
-    BigInt_Add(M, &m2, &temp);
+    // 최종 평문 복원: M = m2 + (h * q)
+    BigInt_Mul(&temp, &h, &key->q); // temp = h * q
+    BigInt_Add(M, &m2, &temp); // M = m2 + temp
 }
-
 
 // ============================================================================
 // [5] main.c (전체 로직 검증 및 실행 파이프라인)
 // ============================================================================
 
+// BigInt의 값을 16진수 문자열 형태로 출력
 void BigInt_Print(const BigInt* a) {
     if (BigInt_IsZero(a)) {
         printf("00000000");
@@ -478,12 +511,12 @@ void BigInt_Print(const BigInt* a) {
 int main() {
     srand((unsigned int)time(NULL));
     
-    RSA_Key key;
-    BigInt plaintext, ciphertext, decrypted;
+    RSA_Key key; // 키 보관 구조체 선언
+    BigInt plaintext, ciphertext, decrypted; // 평문, 암호문, 복호문 변수 선언
     
-    printf("========== [ 순수 C 구현 RSA-CRT 시뮬레이션 (최적화 완료) ] ==========\n\n");
+    printf("========== [ RSA-CRT 시뮬레이션 ] ==========\n\n");
     
-    int key_size = 2048; // 1024비트로 변경 시 연산 시간에 주의하세요.
+    int key_size = 2048; // 연산 시간에 주의
     printf("%d비트 RSA 키 생성 시작...\n", key_size);
     RSA_GenerateKey(&key, key_size);
     printf("\n키 생성 완료!\n\n");
@@ -495,7 +528,7 @@ int main() {
     printf("- 공개키(e) :\n"); BigInt_Print(&key.e); printf("\n\n");
     printf("- 개인키(d) :\n"); BigInt_Print(&key.d); printf("\n\n\n");
     
-    BigInt_Init(&plaintext);
+    BigInt_Init(&plaintext); // 테스트할 평문 초기화 및 설정
     plaintext.data[0] = 0x48454C4C; 
     plaintext.data[1] = 0x0000004F; 
     plaintext.size = 2; // HELLO를 32비트 단위로 저장
@@ -508,7 +541,7 @@ int main() {
     RSA_Decrypt_CRT(&decrypted, &ciphertext, &key);
     printf("복호화 완료 (M) :\n"); BigInt_Print(&decrypted); printf("\n\n");
     
-    if (BigInt_Compare(&plaintext, &decrypted) == 0) {
+    if (BigInt_Compare(&plaintext, &decrypted) == 0) { // 최초에 설정한 평문과 동일한지 검증
         printf("[SUCCESS] CRT 기반 수학적 RSA 암복호화가 완벽히 일치합니다.\n");
     } else {
         printf("[FAILED] 연산 무결성 검증 실패.\n");
