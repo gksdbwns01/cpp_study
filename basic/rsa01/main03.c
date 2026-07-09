@@ -9,85 +9,96 @@
 // [1] bigint.h & bigint.c (Big Integer 직접 구현)
 // ============================================================================
 
-// [개선] 256 워드 = 8192 비트 지원 (최대 4096비트 RSA의 곱셈 버퍼용으로 충분히 확장)
+// 256 워드 = 8192 비트 지원 (최대 4096비트 RSA의 곱셈 버퍼용 확장)
+// 32비트(4바이트) 정수 256개를 배열로 묶어 최대 8192비트 정수 표현
 #define MAX_WORDS 256 
 
+// 큰 정수를 표현 구조체 정의
 typedef struct {
-    uint32_t data[MAX_WORDS];
+    uint32_t data[MAX_WORDS]; // 데이터를 저장하는 32비트 정수 배열
     int size; // 사용 중인 32비트 워드의 개수
 } BigInt;
 
+// BigInt 변수를 0으로 초기화
 void BigInt_Init(BigInt* a) {
     memset(a->data, 0, sizeof(a->data));
     a->size = 0;
 }
 
+// src의 값을 dest로 복사
 void BigInt_Copy(BigInt* dest, const BigInt* src) {
     memcpy(dest->data, src->data, sizeof(src->data));
     dest->size = src->size;
 }
 
+// 상위 0을 제거. 데이터 크기를 맞추는 함수
 void BigInt_Trim(BigInt* a) {
     while (a->size > 0 && a->data[a->size - 1] == 0) {
         a->size--;
     }
 }
 
+// BigInt의 값이 0인지 확인
 bool BigInt_IsZero(const BigInt* a) {
+    // 사이즈가 0이거나 사이즈가 1인데 첫 번째 워드가 0이면 true 반환
     return a->size == 0 || (a->size == 1 && a->data[0] == 0);
 }
 
+// 두 BigInt의 크기 비교
 int BigInt_Compare(const BigInt* a, const BigInt* b) {
     if (a->size > b->size) return 1;
     if (a->size < b->size) return -1;
-    for (int i = a->size - 1; i >= 0; i--) {
+    for (int i = a->size - 1; i >= 0; i--) { // 워드 개수가 같다면 최상위 워드부터 비교
         if (a->data[i] > b->data[i]) return 1;
         if (a->data[i] < b->data[i]) return -1;
     }
     return 0;
 }
 
+// 두 BigInt를 더함
 void BigInt_Add(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
-    uint64_t carry = 0;
-    int max_size = (a->size > b->size) ? a->size : b->size;
+    uint64_t carry = 0; // 덧셈 시 발생하는 올림수 저장
+    int max_size = (a->size > b->size) ? a->size : b->size; // 두 수 중 큰 사이즈를 기준으로 반복
     
     for (int i = 0; i < max_size || carry > 0; i++) {
-        if (i >= MAX_WORDS) break; // 안전 장치
+        if (i >= MAX_WORDS) break; // 오버플로우 방지
         uint64_t sum = carry;
         if (i < a->size) sum += a->data[i];
         if (i < b->size) sum += b->data[i];
         
         temp.data[i] = (uint32_t)(sum & 0xFFFFFFFF);
-        carry = sum >> 32;
-        temp.size = i + 1;
+        carry = sum >> 32; // 상위 32비트는 다음 자리로 넘길 올림수로 갱신
+        temp.size = i + 1; // 현재까지 처리된 자릿수로 사이즈 갱신
     }
-    BigInt_Copy(res, &temp);
+    BigInt_Copy(res, &temp); // 계산 완료된 임시 결과를 res에 복사
 }
 
+// 두 BigInt를 뺌
 void BigInt_Sub(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
-    int64_t borrow = 0;
+    int64_t borrow = 0; // 뺄셈 시 발생하는 빌림수 저장
     
-    for (int i = 0; i < a->size; i++) {
+    for (int i = 0; i < a->size; i++) { // 빼지는 수(a)의 크기만큼 반복
         int64_t diff = (int64_t)a->data[i] - borrow;
         if (i < b->size) diff -= b->data[i];
         
-        if (diff < 0) {
-            diff += 0x100000000LL;
+        if (diff < 0) { // 뺀 결과가 음수라면 윗자리에서 빌림
+            diff += 0x100000000LL; // 2^32를 더해 양수로 보정
             borrow = 1;
         } else {
             borrow = 0;
         }
-        temp.data[i] = (uint32_t)diff;
-        temp.size = i + 1;
+        temp.data[i] = (uint32_t)diff; // 뺄셈 후 상위에 남은 0들을 제거
+        temp.size = i + 1; // 임시 사이즈 갱신
     }
-    BigInt_Trim(&temp);
-    BigInt_Copy(res, &temp);
+    BigInt_Trim(&temp); // 뺄셈 후 상위에 남은 0들을 제거
+    BigInt_Copy(res, &temp); // 결과를 최종 변수에 복사
 }
 
+// 두 BigInt를 곱함
 void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -96,18 +107,18 @@ void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
         return;
     }
     
-    temp.size = a->size + b->size;
+    temp.size = a->size + b->size; // 곱한 결과의 최대 자릿수는 a자릿수 + b자릿수
     if (temp.size > MAX_WORDS) temp.size = MAX_WORDS; // 오버플로우 방지
     
-    for (int i = 0; i < a->size; i++) {
+    for (int i = 0; i < a->size; i++) { // a의 각 자릿수를 순회
         uint64_t carry = 0;
-        for (int j = 0; j < b->size; j++) {
+        for (int j = 0; j < b->size; j++) { // b의 각 자릿수를 순회
             if (i + j >= MAX_WORDS) break;
             uint64_t prod = (uint64_t)a->data[i] * b->data[j] + temp.data[i + j] + carry;
-            temp.data[i + j] = (uint32_t)(prod & 0xFFFFFFFF);
-            carry = prod >> 32;
+            temp.data[i + j] = (uint32_t)(prod & 0xFFFFFFFF); // 하위 32비트를 현재 자리에 저장
+            carry = prod >> 32; // 상위 32비트는 다음 자리로 넘김
         }
-        if (i + b->size < MAX_WORDS) {
+        if (i + b->size < MAX_WORDS) { // 곱셈이 끝나고도 올림수가 남아있고 공간이 있다면 저장
             temp.data[i + b->size] = (uint32_t)carry;
         }
     }
@@ -115,24 +126,26 @@ void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt_Copy(res, &temp);
 }
 
+// BigInt를 1비트 왼쪽으로 시프트
 void BigInt_ShiftLeft1(BigInt* a) {
     if (BigInt_IsZero(a)) return;
-    uint32_t carry = 0;
+    uint32_t carry = 0; // 다음 워드로 넘어갈 비트값 저장
     for (int i = 0; i < a->size; i++) {
-        uint32_t next_carry = a->data[i] >> 31;
+        uint32_t next_carry = a->data[i] >> 31; // 최상위 비트를 추출하여 보관
         a->data[i] = (a->data[i] << 1) | carry;
-        carry = next_carry;
+        carry = next_carry; // carry 갱신
     }
-    if (carry > 0 && a->size < MAX_WORDS) {
+    if (carry > 0 && a->size < MAX_WORDS) { // 캐리가 남았고 배열 공간이 있다면 캐리값 저장
         a->data[a->size] = carry;
         a->size++;
     }
 }
 
+// BigInt 나눗셈, 나머지 연산 (몫 q, 나머지 r)
 void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
     BigInt temp_q, temp_r;
-    BigInt_Init(&temp_q);
-    BigInt_Init(&temp_r);
+    BigInt_Init(&temp_q); // 몫 임시 변수
+    BigInt_Init(&temp_r); // 나머지 임시 변수
     
     if (BigInt_IsZero(b) || BigInt_IsZero(a)) {
         if (q) BigInt_Copy(q, &temp_q);
@@ -140,18 +153,20 @@ void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
         return;
     }
     
-    if (BigInt_Compare(a, b) < 0) {
-        if (q) BigInt_Copy(q, &temp_q);
-        if (r) BigInt_Copy(r, a);
+    if (BigInt_Compare(a, b) < 0) { // 나누어지는 수가 나누는 수보다 작다면
+        if (q) BigInt_Copy(q, &temp_q); // 몫은 0
+        if (r) BigInt_Copy(r, a); // 나머지는 a 그대로
         return;
     }
     
-    int a_bits = (a->size - 1) * 32;
-    uint32_t top = a->data[a->size - 1];
-    while (top) { a_bits++; top >>= 1; }
+    // a의 총 비트 수를 계산
+    int a_bits = (a->size - 1) * 32; // 최상위 워드를 제외한 나머지 워드들의 비트 수 합
+    uint32_t top = a->data[a->size - 1]; // 최상위 워드
+    while (top) { a_bits++; top >>= 1; } // 최상위 워드의 실제 비트 길이 더함
     
-    temp_q.size = (a_bits + 31) / 32;
+    temp_q.size = (a_bits + 31) / 32; // 몫을 담을 변수의 사이즈
     
+    // a의 최상위 비트부터 내려오면서 나눗셈 진행 (Shift-Subtract 알고리즘)
     for (int i = a_bits - 1; i >= 0; i--) {
         BigInt_ShiftLeft1(&temp_r);
         
@@ -176,13 +191,14 @@ void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
     if (r) BigInt_Copy(r, &temp_r);
 }
 
+// 큰 수 a를 32비트 작은 정수 m으로 나눈 나머지를 구하는 최적화 함수 (소수 판별용)
 uint32_t BigInt_Mod_Small(const BigInt* a, uint32_t m) {
-    uint64_t rem = 0;
+    uint64_t rem = 0; // 나머지를 보관할 변수
     for (int i = a->size - 1; i >= 0; i--) {
-        rem = (rem << 32) | a->data[i];
+        rem = (rem << 32) | a->data[i]; // 이전 나머지 값을 상위 32비트로 시프트하고 현재 워드를 붙여서 새 값을 만듦
         rem %= m;
     }
-    return (uint32_t)rem;
+    return (uint32_t)rem; // 최종 나머지를 32비트로 캐스팅하여 반환
 }
 
 
