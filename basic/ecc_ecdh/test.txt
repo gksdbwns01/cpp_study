@@ -1,0 +1,6 @@
+주제: ECC
+구현: ECDH
+ECC랜덤값 만들고 구현
+
+main01
+EC_InitParameters() - SECP256R1의 타원곡선(완전동일)
