@@ -2,5 +2,12 @@
 구현: ECDH
 ECC랜덤값 만들고 구현
 
+앞에 0으로 패딩된거 고치면 좋을듯?
+
 main01
 EC_InitParameters() - SECP256R1의 타원곡선(완전동일)
+
+full - 모든 주석
+ModInverse의 부호 갱신 로직 (newt_sign = t_sign == newt_sign ? -newt_sign : t_sign;)은 일반적인 확장 유클리드 구현과는 조금 다른 관례적인 방식이라 주석에 표시해뒀습니다. 결과가 맞는지 확인해보시되, 헷갈리기 쉬운 부분이니 참고하세요.
+**BigInt_DivMod**는 비트 단위로 시프트-뺄셈을 반복하는 방식이라 이전에 논의하셨던 것처럼 ModExp 내부에서 반복 호출되면 성능 병목이 될 수 있는 구조입니다. RSA 쪽 최적화 작업과 이어서 보시면 좋을 것 같습니다.
+**EC_GeneratePrivateKey**에서 rand()를 쓰는 부분은 데모/학습용으로는 괜찮지만, 실제 서비스에는 CSPRNG가 필요하다는 점도 주석에 남겨뒀습니다.
