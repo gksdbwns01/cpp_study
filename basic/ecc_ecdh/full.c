@@ -409,36 +409,41 @@ void EC_Scalar_Mul(EC_Point* R, const EC_Point* P, const BigInt* k, const BigInt
 // ============================================================================
 // [4] ECDH 로직 (개인키 생성 및 키 교환)
 // ============================================================================
-#include <openssl/rand.h>
+#include <sys/random.h>
 
+// 안전한 난수를 생성하는 범용 헬퍼 함수
 int GenerateSecureRandom(uint8_t* buffer, size_t length) {
-    // 성공 시 1 반환, 실패 시 0 또는 -1 반환
-    if (RAND_bytes(buffer, length) != 1) {
-        return -1; 
+    // getrandom을 호출하여 요청한 길이(length)만큼 버퍼에 난수를 채웁니다.
+    // 3번째 인자 0: /dev/urandom과 동일한 동작(기본 설정)
+    ssize_t result = getrandom(buffer, length, 0);
+
+    // 요청한 바이트 수(length)만큼 정확히 가져왔는지 확인
+    if (result != (ssize_t)length) {
+        return -1; // 실패 시 -1 반환
     }
-    return 0;
+    
+    return 0; // 성공 시 0 반환
 }
 
-// 타원 곡선의 위수(n) 보다 작은 랜덤 개인키(스칼라) 생성
+// CSPRNG를 사용하여 P-256 개인키를 생성하는 함수
 void EC_GeneratePrivateKey(BigInt* privKey) {
-    int bytes = 256 / 8;  // 32바이트
-    int words = 256 / 32; // 8워드 (1워드 = 32비트)
+    int bytes = 256 / 8;  // 32바이트 (256비트)
+    int words = 256 / 32; // 8개의 32비트 워드
 
     do {
-        BigInt_Init(privKey);
-        
-        // 1. 안전한 난수 32바이트를 privKey의 data 영역에 직접 채움
-        // privKey->data가 uint32_t 배열이라고 가정하고 byte 포인터로 캐스팅
+        BigInt_Init(privKey); // 매 시도마다 privKey 초기화
+
+        // GenerateSecureRandom을 호출하여 privKey->data 배열에 32바이트 난수를 직접 씁니다.
+        // privKey->data가 uint32_t 배열이므로 호환성을 위해 (uint8_t*)로 캐스팅합니다.
         if (GenerateSecureRandom((uint8_t*)privKey->data, bytes) != 0) {
-            // 난수 생성 실패 시 처리 (프로그램 종료 또는 에러 반환)
-            printf("Error: Secure random generation failed!\n");
-            exit(1); 
+            fprintf(stderr, "Fatal Error: Failed to generate secure random numbers for private key.\n");
+            exit(EXIT_FAILURE); // 난수 생성 실패 시 보안을 위해 프로그램 즉시 종료
         }
 
-        privKey->size = words;   // 8개 워드 세팅 완료
-        BigInt_Trim(privKey);    // 최상위 워드가 0이면 정리
+        privKey->size = words;   // 8개 워드를 모두 채웠다고 표시
+        BigInt_Trim(privKey);    // 최상위 워드가 우연히 0이면 길이 조정
 
-        // 2. 0보다 크고, n(곡선의 위수)보다 작을 때까지 반복
+        // 생성된 키가 0이 아니고, 곡선의 위수(n)보다 작을 때까지 반복하여 유효성 검증
     } while (BigInt_IsZero(privKey) || BigInt_Compare(privKey, &P256_n) >= 0);
 }
 
