@@ -11,3 +11,40 @@ full - 모든 주석
 ModInverse의 부호 갱신 로직 (newt_sign = t_sign == newt_sign ? -newt_sign : t_sign;)은 일반적인 확장 유클리드 구현과는 조금 다른 관례적인 방식이라 주석에 표시해뒀습니다. 결과가 맞는지 확인해보시되, 헷갈리기 쉬운 부분이니 참고하세요.
 **BigInt_DivMod**는 비트 단위로 시프트-뺄셈을 반복하는 방식이라 이전에 논의하셨던 것처럼 ModExp 내부에서 반복 호출되면 성능 병목이 될 수 있는 구조입니다. RSA 쪽 최적화 작업과 이어서 보시면 좋을 것 같습니다.
 **EC_GeneratePrivateKey**에서 rand()를 쓰는 부분은 데모/학습용으로는 괜찮지만, 실제 서비스에는 CSPRNG가 필요하다는 점도 주석에 남겨뒀습니다.
+
+** 컴파일 명령어 - OpenSSL코드 사용시
+gcc full.c -o full -lcrypto
+./full
+코드
+#include <openssl/rand.h>
+
+int GenerateSecureRandom(uint8_t* buffer, size_t length) {
+    // 성공 시 1 반환, 실패 시 0 또는 -1 반환
+    if (RAND_bytes(buffer, length) != 1) {
+        return -1; 
+    }
+    return 0;
+}
+
+// 타원 곡선의 위수(n) 보다 작은 랜덤 개인키(스칼라) 생성
+void EC_GeneratePrivateKey(BigInt* privKey) {
+    int bytes = 256 / 8;  // 32바이트
+    int words = 256 / 32; // 8워드 (1워드 = 32비트)
+
+    do {
+        BigInt_Init(privKey);
+        
+        // 1. 안전한 난수 32바이트를 privKey의 data 영역에 직접 채움
+        // privKey->data가 uint32_t 배열이라고 가정하고 byte 포인터로 캐스팅
+        if (GenerateSecureRandom((uint8_t*)privKey->data, bytes) != 0) {
+            // 난수 생성 실패 시 처리 (프로그램 종료 또는 에러 반환)
+            printf("Error: Secure random generation failed!\n");
+            exit(1); 
+        }
+
+        privKey->size = words;   // 8개 워드 세팅 완료
+        BigInt_Trim(privKey);    // 최상위 워드가 0이면 정리
+
+        // 2. 0보다 크고, n(곡선의 위수)보다 작을 때까지 반복
+    } while (BigInt_IsZero(privKey) || BigInt_Compare(privKey, &P256_n) >= 0);
+}

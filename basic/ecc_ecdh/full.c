@@ -409,20 +409,36 @@ void EC_Scalar_Mul(EC_Point* R, const EC_Point* P, const BigInt* k, const BigInt
 // ============================================================================
 // [4] ECDH 로직 (개인키 생성 및 키 교환)
 // ============================================================================
+#include <openssl/rand.h>
+
+int GenerateSecureRandom(uint8_t* buffer, size_t length) {
+    // 성공 시 1 반환, 실패 시 0 또는 -1 반환
+    if (RAND_bytes(buffer, length) != 1) {
+        return -1; 
+    }
+    return 0;
+}
 
 // 타원 곡선의 위수(n) 보다 작은 랜덤 개인키(스칼라) 생성
 void EC_GeneratePrivateKey(BigInt* privKey) {
+    int bytes = 256 / 8;  // 32바이트
+    int words = 256 / 32; // 8워드 (1워드 = 32비트)
+
     do {
-        BigInt_Init(privKey);        // 매 시도마다 privKey를 0으로 초기화
-        int words = 256 / 32;         // P-256은 256비트 키이므로 8개의 32비트 워드가 필요
-        for (int i = 0; i < words; i++) {
-            // rand()는 보통 15~31비트 정도의 난수만 제공하므로, 두 번 호출해 32비트를 채움
-            // 주의: rand()는 암호학적으로 안전한 난수 생성기가 아니므로 실제 서비스에는 부적합
-            privKey->data[i] = (rand() << 16) | (rand() & 0xFFFF);
+        BigInt_Init(privKey);
+        
+        // 1. 안전한 난수 32바이트를 privKey의 data 영역에 직접 채움
+        // privKey->data가 uint32_t 배열이라고 가정하고 byte 포인터로 캐스팅
+        if (GenerateSecureRandom((uint8_t*)privKey->data, bytes) != 0) {
+            // 난수 생성 실패 시 처리 (프로그램 종료 또는 에러 반환)
+            printf("Error: Secure random generation failed!\n");
+            exit(1); 
         }
-        privKey->size = words;   // 8개 워드를 모두 채웠다고 표시
-        BigInt_Trim(privKey);     // 최상위 워드가 우연히 0이면 정리
-        // 0보다 크고, n(곡선의 위수)보다 작을 때까지 반복 (유효한 개인키 범위를 만족할 때까지 재시도)
+
+        privKey->size = words;   // 8개 워드 세팅 완료
+        BigInt_Trim(privKey);    // 최상위 워드가 0이면 정리
+
+        // 2. 0보다 크고, n(곡선의 위수)보다 작을 때까지 반복
     } while (BigInt_IsZero(privKey) || BigInt_Compare(privKey, &P256_n) >= 0);
 }
 
