@@ -452,7 +452,6 @@ void EC_GeneratePrivateKey(BigInt* privKey) {
 // ============================================================================
 
 int main() {
-    srand((unsigned int)time(NULL)); // 현재 시각을 시드로 난수 생성기 초기화 (테스트/데모용, 암호학적으로는 부적절)
     EC_InitParameters();               // NIST P-256 표준 파라미터(p, a, b, G, n) 초기화
 
     printf("========== [ 순수 수학 구현 기반 ECDH 키 교환 시뮬레이션 ] ==========\n\n");
