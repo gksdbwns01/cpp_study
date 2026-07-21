@@ -450,10 +450,6 @@ void EC_GeneratePrivateKey(BigInt* privKey) {
 // [5] main() 함수: ECDH 파이프라인 시뮬레이션
 // ============================================================================
 
-// ============================================================================
-// [5] main() 함수: ECDH 파이프라인 시뮬레이션 (Y좌표 출력 추가)
-// ============================================================================
-
 int main() {
     EC_InitParameters();               // NIST P-256 표준 파라미터(p, a, b, G, n) 초기화
 
@@ -463,7 +459,7 @@ int main() {
     EC_Point alice_pub, bob_pub, alice_shared, bob_shared;         // 공개키와 각자 계산한 공유 비밀
 
     // 1. Alice 키 쌍 생성
-    printf("[1] Alice 키 생성 중...\n");
+    printf("Alice 키 생성 중...\n");
     EC_GeneratePrivateKey(&alice_priv);                       // Alice의 개인키(랜덤 스칼라) 생성
     EC_Scalar_Mul(&alice_pub, &P256_G, &alice_priv, &P256_a, &P256_p); // Alice 공개키 = 개인키 * G
 
@@ -472,7 +468,7 @@ int main() {
     printf("  > Alice Public Key (Y): "); BigInt_PrintHex(&alice_pub.y); printf("\n\n"); // Y좌표 출력 추가
 
     // 2. Bob 키 쌍 생성
-    printf("[2] Bob 키 생성 중...\n");
+    printf("Bob 키 생성 중...\n");
     EC_GeneratePrivateKey(&bob_priv);                          // Bob의 개인키 생성
     EC_Scalar_Mul(&bob_pub, &P256_G, &bob_priv, &P256_a, &P256_p);   // Bob 공개키 = 개인키 * G
 
@@ -481,7 +477,7 @@ int main() {
     printf("  > Bob Public Key (Y): "); BigInt_PrintHex(&bob_pub.y); printf("\n\n"); // Y좌표 출력 추가
 
     // 3. 키 교환 (서로의 공개키로 공유 비밀키 계산)
-    printf("[3] ECDH 공유 비밀키(Shared Secret) 계산 중...\n");
+    printf("ECDH 공유 비밀키(Shared Secret) 계산 중...\n");
     // Alice 측 계산: Shared = Alice_Priv * Bob_Pub
     EC_Scalar_Mul(&alice_shared, &bob_pub, &alice_priv, &P256_a, &P256_p);
     // Bob 측 계산: Shared = Bob_Priv * Alice_Pub
