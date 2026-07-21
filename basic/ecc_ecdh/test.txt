@@ -2,7 +2,7 @@
 구현: ECDH
 ECC랜덤값 만들고 구현
 
-앞에 0으로 패딩된거 고치면 좋을듯?
+점 압축 넣으면 좋을듯?
 
 main01
 EC_InitParameters() - SECP256R1의 타원곡선(완전동일)

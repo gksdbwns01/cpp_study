@@ -450,10 +450,14 @@ void EC_GeneratePrivateKey(BigInt* privKey) {
 // [5] main() 함수: ECDH 파이프라인 시뮬레이션
 // ============================================================================
 
+// ============================================================================
+// [5] main() 함수: ECDH 파이프라인 시뮬레이션 (Y좌표 출력 추가)
+// ============================================================================
+
 int main() {
     EC_InitParameters();               // NIST P-256 표준 파라미터(p, a, b, G, n) 초기화
 
-    printf("========== [ 순수 수학 구현 기반 ECDH 키 교환 시뮬레이션 ] ==========\n\n");
+    printf("========== [ ECDH 키 교환 시뮬레이션 ] ==========\n\n");
 
     BigInt alice_priv, bob_priv;                                   // Alice와 Bob의 개인키
     EC_Point alice_pub, bob_pub, alice_shared, bob_shared;         // 공개키와 각자 계산한 공유 비밀
@@ -464,7 +468,8 @@ int main() {
     EC_Scalar_Mul(&alice_pub, &P256_G, &alice_priv, &P256_a, &P256_p); // Alice 공개키 = 개인키 * G
 
     printf("  > Alice Private Key: "); BigInt_PrintHex(&alice_priv); printf("\n");
-    printf("  > Alice Public Key (X): "); BigInt_PrintHex(&alice_pub.x); printf("\n\n");
+    printf("  > Alice Public Key (X): "); BigInt_PrintHex(&alice_pub.x); printf("\n");
+    printf("  > Alice Public Key (Y): "); BigInt_PrintHex(&alice_pub.y); printf("\n\n"); // Y좌표 출력 추가
 
     // 2. Bob 키 쌍 생성
     printf("[2] Bob 키 생성 중...\n");
@@ -472,7 +477,8 @@ int main() {
     EC_Scalar_Mul(&bob_pub, &P256_G, &bob_priv, &P256_a, &P256_p);   // Bob 공개키 = 개인키 * G
 
     printf("  > Bob Private Key: "); BigInt_PrintHex(&bob_priv); printf("\n");
-    printf("  > Bob Public Key (X): "); BigInt_PrintHex(&bob_pub.x); printf("\n\n");
+    printf("  > Bob Public Key (X): "); BigInt_PrintHex(&bob_pub.x); printf("\n");
+    printf("  > Bob Public Key (Y): "); BigInt_PrintHex(&bob_pub.y); printf("\n\n"); // Y좌표 출력 추가
 
     // 3. 키 교환 (서로의 공개키로 공유 비밀키 계산)
     printf("[3] ECDH 공유 비밀키(Shared Secret) 계산 중...\n");
@@ -482,10 +488,13 @@ int main() {
     EC_Scalar_Mul(&bob_shared, &alice_pub, &bob_priv, &P256_a, &P256_p);
     // ECDH의 핵심 원리: (Alice_Priv * Bob_Priv) * G == (Bob_Priv * Alice_Priv) * G 이므로 양쪽 결과가 같아야 함
 
-    printf("\n  > Alice가 계산한 Shared Secret (X좌표):\n    ");
-    BigInt_PrintHex(&alice_shared.x); printf("\n");
-    printf("  > Bob이 계산한 Shared Secret (X좌표):\n    ");
-    BigInt_PrintHex(&bob_shared.x); printf("\n\n");
+    printf("\n  > Alice가 계산한 Shared Secret:\n");
+    printf("    (X) "); BigInt_PrintHex(&alice_shared.x); printf("\n");
+    printf("    (Y) "); BigInt_PrintHex(&alice_shared.y); printf("\n\n"); // Y좌표 출력 추가
+
+    printf("  > Bob이 계산한 Shared Secret:\n");
+    printf("    (X) "); BigInt_PrintHex(&bob_shared.x); printf("\n");
+    printf("    (Y) "); BigInt_PrintHex(&bob_shared.y); printf("\n\n"); // Y좌표 출력 추가
 
     // 4. 검증
     if (BigInt_Compare(&alice_shared.x, &bob_shared.x) == 0 &&
