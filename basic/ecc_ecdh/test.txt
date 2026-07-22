@@ -12,6 +12,10 @@ ModInverse의 부호 갱신 로직 (newt_sign = t_sign == newt_sign ? -newt_sign
 **BigInt_DivMod**는 비트 단위로 시프트-뺄셈을 반복하는 방식이라 이전에 논의하셨던 것처럼 ModExp 내부에서 반복 호출되면 성능 병목이 될 수 있는 구조입니다. RSA 쪽 최적화 작업과 이어서 보시면 좋을 것 같습니다.
 CSPRNG - 리눅스 환경의 getrandom() 사용
 
+main02.c
+점 압축
+
+
 ** 컴파일 명령어 - OpenSSL코드 사용시
 gcc full.c -o full -lcrypto
 ./full
