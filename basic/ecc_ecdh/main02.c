@@ -260,7 +260,6 @@ void ModMul(BigInt* res, const BigInt* a, const BigInt* b, const BigInt* m) {
     BigInt_DivMod(NULL, res, &temp, m);
 }
 
-// [추가] 모듈러 거듭제곱: (base^exp) mod m (점 복원 시 y좌표 계산용)
 void ModExp(BigInt* res, const BigInt* base, const BigInt* exp, const BigInt* m) {
     BigInt result;
     BigInt_Init(&result);
@@ -295,7 +294,7 @@ void ModExp(BigInt* res, const BigInt* base, const BigInt* exp, const BigInt* m)
 
 
 // ============================================================================
-// [3] 타원 곡선 수학 (Elliptic Curve Cryptography over GF(p))
+// [3] 타원 곡선 수학
 // ============================================================================
 
 typedef struct {
@@ -400,17 +399,17 @@ void EC_Scalar_Mul(EC_Point* R, const EC_Point* P, const BigInt* k, const BigInt
 }
 
 // ----------------------------------------------------------------------------
-// [추가] 점 압축 및 복원 함수
+// 점 압축 및 복원 함수
 // ----------------------------------------------------------------------------
 
 // EC Point를 압축하여 Prefix(0x02 또는 0x03) 반환 및 comp_x에 X좌표 저장
 uint8_t EC_Point_Compress(const EC_Point* P, BigInt* comp_x) {
     if (P->is_infinity) return 0x00; // 무한원점은 0x00으로 표기
-    
+
     BigInt_Copy(comp_x, &P->x);
     // Y좌표의 최하위 비트(LSB)가 0이면 짝수(0x02), 1이면 홀수(0x03)
     uint8_t parity = P->y.data[0] & 1;
-    return 0x02 + parity; 
+    return 0x02 + parity;
 }
 
 // Prefix와 X좌표로 Y좌표를 복원하여 점을 온전하게 만듦
@@ -425,7 +424,7 @@ bool EC_Point_Decompress(EC_Point* P, uint8_t prefix, const BigInt* comp_x, cons
     P->is_infinity = false;
 
     BigInt x_sq, x_cb, ax, z, y, y_sq;
-    
+
     // z = x^3 + ax + b mod p (타원 곡선 방정식 우항)
     ModMul(&x_sq, comp_x, comp_x, p);    // x^2
     ModMul(&x_cb, &x_sq, comp_x, p);     // x^3
@@ -487,7 +486,7 @@ void EC_GeneratePrivateKey(BigInt* privKey) {
 }
 
 // ============================================================================
-// [5] main() 함수: ECDH 파이프라인 및 압축 시뮬레이션
+// [5] main() 함수
 // ============================================================================
 
 int main() {
@@ -503,61 +502,58 @@ int main() {
     BigInt bob_pub_comp_x;
     EC_Point bob_pub_decompressed;
 
-    // 1. Alice 키 쌍 생성
-    printf("[1] Alice 키 생성 중...\n");
+    // Alice 키 쌍 생성
+    printf("Alice 키 생성 중...\n");
     EC_GeneratePrivateKey(&alice_priv);
     EC_Scalar_Mul(&alice_pub, &P256_G, &alice_priv, &P256_a, &P256_p);
 
-    printf("  > Alice Private Key: "); BigInt_PrintHex(&alice_priv); printf("\n");
-    printf("  > Alice Public Key (X): "); BigInt_PrintHex(&alice_pub.x); printf("\n");
-    printf("  > Alice Public Key (Y): "); BigInt_PrintHex(&alice_pub.y); printf("\n\n");
+    printf("Alice Private Key: "); BigInt_PrintHex(&alice_priv); printf("\n");
+    printf("Alice Public Key (X): "); BigInt_PrintHex(&alice_pub.x); printf("\n");
+    printf("Alice Public Key (Y): "); BigInt_PrintHex(&alice_pub.y); printf("\n\n");
 
-    // 2. Bob 키 쌍 생성
-    printf("[2] Bob 키 생성 중...\n");
+    // Bob 키 쌍 생성
+    printf("Bob 키 생성 중...\n");
     EC_GeneratePrivateKey(&bob_priv);
     EC_Scalar_Mul(&bob_pub, &P256_G, &bob_priv, &P256_a, &P256_p);
 
-    printf("  > Bob Private Key: "); BigInt_PrintHex(&bob_priv); printf("\n");
-    printf("  > Bob Public Key (X): "); BigInt_PrintHex(&bob_pub.x); printf("\n");
-    printf("  > Bob Public Key (Y): "); BigInt_PrintHex(&bob_pub.y); printf("\n\n");
+    printf("Bob Private Key: "); BigInt_PrintHex(&bob_priv); printf("\n");
+    printf("Bob Public Key (X): "); BigInt_PrintHex(&bob_pub.x); printf("\n");
+    printf("Bob Public Key (Y): "); BigInt_PrintHex(&bob_pub.y); printf("\n\n");
 
-    // ---------------------------------------------------------
-    // [추가된 구간] Bob의 공개키 압축 및 복원 (통신 시뮬레이션)
-    // ---------------------------------------------------------
-    printf("[3] Bob의 공개키를 압축하여 Alice에게 전송 시뮬레이션\n");
+    // Bob의 공개키 압축 및 복원
+    printf("Bob의 공개키를 압축하여 Alice에게 전송\n");
     
     // Bob이 자신의 공개키 압축
     bob_pub_prefix = EC_Point_Compress(&bob_pub, &bob_pub_comp_x);
-    printf("  > Bob이 전송하는 압축 데이터:\n");
-    printf("    Prefix: 0x%02X\n", bob_pub_prefix);
-    printf("    X좌표 : "); BigInt_PrintHex(&bob_pub_comp_x); printf("\n\n");
+    printf("Bob이 전송하는 압축 데이터: 0x%02X", bob_pub_prefix);
+    BigInt_PrintHex(&bob_pub_comp_x); printf("\n\n");
 
-    // Alice가 받은 데이터를 복원 (Decompression)
-    printf("  > Alice가 수신한 압축 데이터 복원 중...\n");
+    // Alice가 받은 데이터를 복원
+    printf("Alice가 수신한 압축 데이터 복원 중...\n");
     if (EC_Point_Decompress(&bob_pub_decompressed, bob_pub_prefix, &bob_pub_comp_x, &P256_a, &P256_b, &P256_p)) {
-        printf("  > 복원된 Bob Public Key (Y): "); BigInt_PrintHex(&bob_pub_decompressed.y); printf("\n\n");
+        printf("복원된 Bob Public Key (Y): "); BigInt_PrintHex(&bob_pub_decompressed.y); printf("\n\n");
     } else {
-        printf("  > [에러] 점 복원에 실패했습니다. (유효하지 않은 좌표)\n\n");
+        printf("[에러] 점 복원에 실패했습니다. (유효하지 않은 좌표)\n\n");
         return -1;
     }
 
-    // 4. 키 교환 (서로의 공개키로 공유 비밀키 계산)
-    printf("[4] ECDH 공유 비밀키(Shared Secret) 계산 중...\n");
+    // 키 교환 (서로의 공개키로 공유 비밀키 계산)
+    printf("ECDH 공유 비밀키(Shared Secret) 계산 중...\n");
     // Alice 측 계산: 압축 해제된 Bob의 키를 사용
     EC_Scalar_Mul(&alice_shared, &bob_pub_decompressed, &alice_priv, &P256_a, &P256_p);
     
     // Bob 측 계산
     EC_Scalar_Mul(&bob_shared, &alice_pub, &bob_priv, &P256_a, &P256_p);
 
-    printf("\n  > Alice가 계산한 Shared Secret (복원된 키 사용):\n");
+    printf("\nAlice가 계산한 Shared Secret (복원된 키 사용):\n");
     printf("    (X) "); BigInt_PrintHex(&alice_shared.x); printf("\n");
     printf("    (Y) "); BigInt_PrintHex(&alice_shared.y); printf("\n\n");
 
-    printf("  > Bob이 계산한 Shared Secret:\n");
+    printf("Bob이 계산한 Shared Secret:\n");
     printf("    (X) "); BigInt_PrintHex(&bob_shared.x); printf("\n");
     printf("    (Y) "); BigInt_PrintHex(&bob_shared.y); printf("\n\n");
 
-    // 5. 검증
+    // 검증
     if (BigInt_Compare(&alice_shared.x, &bob_shared.x) == 0 &&
         BigInt_Compare(&alice_shared.y, &bob_shared.y) == 0) {
         printf("[SUCCESS] 압축 및 복원 후에도 양측의 공유 비밀키가 완벽히 일치합니다.\n");
