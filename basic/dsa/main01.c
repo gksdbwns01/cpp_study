@@ -16,31 +16,26 @@ typedef struct {
     int size;
 } BigInt;
 
-// BigInt 변수를 0으로 초기화하는 함수
 void BigInt_Init(BigInt* a) {
     memset(a->data, 0, sizeof(a->data));
     a->size = 0;
 }
 
-// BigInt 변수의 값을 다른 변수로 복사하는 함수
 void BigInt_Copy(BigInt* dest, const BigInt* src) {
     memcpy(dest->data, src->data, sizeof(src->data));
     dest->size = src->size;
 }
 
-// BigInt의 최상위 데이터 중 불필요한 0을 제거
 void BigInt_Trim(BigInt* a) {
     while (a->size > 0 && a->data[a->size - 1] == 0) {
         a->size--;
     }
 }
 
-// BigInt가 0인지 확인하는 함수
 bool BigInt_IsZero(const BigInt* a) {
     return a->size == 0 || (a->size == 1 && a->data[0] == 0);
 }
 
-// 두 BigInt 값을 비교하는 함수 (a > b 이면 1, a < b 이면 -1, a == b 이면 0 반환)
 int BigInt_Compare(const BigInt* a, const BigInt* b) {
     if (a->size > b->size) return 1;
     if (a->size < b->size) return -1;
@@ -51,7 +46,6 @@ int BigInt_Compare(const BigInt* a, const BigInt* b) {
     return 0;
 }
 
-// 덧셈 연산: res = a + b
 void BigInt_Add(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -71,7 +65,6 @@ void BigInt_Add(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt_Copy(res, &temp);
 }
 
-// 뺄셈 연산: res = a - b
 void BigInt_Sub(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -94,7 +87,6 @@ void BigInt_Sub(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt_Copy(res, &temp);
 }
 
-// 곱셈 연산: res = a * b
 void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt temp;
     BigInt_Init(&temp);
@@ -121,7 +113,6 @@ void BigInt_Mul(BigInt* res, const BigInt* a, const BigInt* b) {
     BigInt_Copy(res, &temp);
 }
 
-// 1비트 좌측 시프트 (a = a << 1, 즉 a * 2 효과)
 void BigInt_ShiftLeft1(BigInt* a) {
     if (BigInt_IsZero(a)) return;
     uint32_t carry = 0;
@@ -136,7 +127,6 @@ void BigInt_ShiftLeft1(BigInt* a) {
     }
 }
 
-// 나눗셈 및 나머지 연산: q = a / b, r = a % b
 void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
     BigInt temp_q, temp_r;
     BigInt_Init(&temp_q);
@@ -181,7 +171,6 @@ void BigInt_DivMod(BigInt* q, BigInt* r, const BigInt* a, const BigInt* b) {
     if (r) BigInt_Copy(r, &temp_r);
 }
 
-// 모듈러 역원 연산 (확장 유클리드 알고리즘)
 void ModInverse(BigInt* res, const BigInt* e, const BigInt* mod) {
     BigInt t, newt, r, newr, q, temp, prod, next_t;
     int t_sign = 1, newt_sign = 1;
@@ -234,6 +223,26 @@ void BigInt_FromHex(BigInt* a, const char* hex) {
         char buf[9] = {0};
         strncpy(buf, hex + start, i - start);
         a->data[word_idx++] = strtoul(buf, NULL, 16);
+    }
+    a->size = word_idx;
+    BigInt_Trim(a);
+}
+
+// (추가) 해시 결과(32바이트 배열)를 BigInt로 변환하는 함수
+void BigInt_FromBytes(BigInt* a, const uint8_t* bytes, size_t len) {
+    BigInt_Init(a);
+    int word_idx = 0;
+    
+    // 바이트 배열을 뒤에서부터(Little-endian 구조체에 맞게) 읽어옵니다.
+    for (int i = (int)len; i > 0; i -= 4) {
+        uint32_t val = 0;
+        int bytes_to_read = (i >= 4) ? 4 : i;
+        int start = i - bytes_to_read;
+        
+        for (int j = 0; j < bytes_to_read; j++) {
+            val = (val << 8) | bytes[start + j];
+        }
+        a->data[word_idx++] = val;
     }
     a->size = word_idx;
     BigInt_Trim(a);
@@ -408,62 +417,6 @@ void EC_Scalar_Mul(EC_Point* R, const EC_Point* P, const BigInt* k, const BigInt
     *R = res;
 }
 
-// ----------------------------------------------------------------------------
-// 점 압축 및 복원 함수
-// ----------------------------------------------------------------------------
-
-uint8_t EC_Point_Compress(const EC_Point* P, BigInt* comp_x) {
-    if (P->is_infinity) return 0x00;
-
-    BigInt_Copy(comp_x, &P->x);
-    uint8_t parity = P->y.data[0] & 1;
-    return 0x02 + parity;
-}
-
-bool EC_Point_Decompress(EC_Point* P, uint8_t prefix, const BigInt* comp_x, const BigInt* a, const BigInt* b, const BigInt* p) {
-    if (prefix == 0x00) {
-        P->is_infinity = true;
-        return true;
-    }
-    if (prefix != 0x02 && prefix != 0x03) return false;
-
-    BigInt_Copy(&P->x, comp_x);
-    P->is_infinity = false;
-
-    BigInt x_sq, x_cb, ax, z, y, y_sq;
-
-    ModMul(&x_sq, comp_x, comp_x, p);
-    ModMul(&x_cb, &x_sq, comp_x, p);
-    ModMul(&ax, a, comp_x, p);
-    ModAdd(&z, &x_cb, &ax, p);
-    ModAdd(&z, &z, b, p);
-
-    BigInt p_plus_1, four, p_plus_1_over_4, temp_one;
-    BigInt_Init(&four); four.data[0] = 4; four.size = 1;
-    BigInt_Init(&temp_one); temp_one.data[0] = 1; temp_one.size = 1;
-    
-    BigInt_Add(&p_plus_1, p, &temp_one);
-    BigInt_DivMod(&p_plus_1_over_4, NULL, &p_plus_1, &four);
-
-    ModExp(&y, &z, &p_plus_1_over_4, p);
-
-    ModMul(&y_sq, &y, &y, p);
-    if (BigInt_Compare(&y_sq, &z) != 0) {
-        return false;
-    }
-
-    uint8_t y_parity = y.data[0] & 1;
-    uint8_t expected_parity = prefix - 0x02;
-
-    if (y_parity != expected_parity) {
-        ModSub(&P->y, p, &y, p);
-    } else {
-        BigInt_Copy(&P->y, &y);
-    }
-
-    return true;
-}
-
 // ============================================================================
 // [4] 난수 생성 및 키 로직
 // ============================================================================
@@ -489,6 +442,106 @@ void EC_GeneratePrivateKey(BigInt* privKey) {
 }
 
 // ============================================================================
+// [4.5] SHA-256 해시 함수 구현 (추가됨)
+// ============================================================================
+#define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
+#define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
+#define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
+#define EP0(x) (ROTRIGHT(x,2) ^ ROTRIGHT(x,13) ^ ROTRIGHT(x,22))
+#define EP1(x) (ROTRIGHT(x,6) ^ ROTRIGHT(x,11) ^ ROTRIGHT(x,25))
+#define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
+#define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
+
+typedef struct {
+    uint8_t data[64];
+    uint32_t datalen;
+    unsigned long long bitlen;
+    uint32_t state[8];
+} SHA256_CTX;
+
+static const uint32_t k[64] = {
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+};
+
+void sha256_transform(SHA256_CTX *ctx, const uint8_t data[]) {
+    uint32_t a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
+    for (i = 0, j = 0; i < 16; ++i, j += 4)
+        m[i] = (data[j] << 24) | (data[j + 1] << 16) | (data[j + 2] << 8) | (data[j + 3]);
+    for ( ; i < 64; ++i)
+        m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
+
+    a = ctx->state[0]; b = ctx->state[1]; c = ctx->state[2]; d = ctx->state[3];
+    e = ctx->state[4]; f = ctx->state[5]; g = ctx->state[6]; h = ctx->state[7];
+
+    for (i = 0; i < 64; ++i) {
+        t1 = h + EP1(e) + CH(e,f,g) + k[i] + m[i];
+        t2 = EP0(a) + MAJ(a,b,c);
+        h = g; g = f; f = e; e = d + t1;
+        d = c; c = b; b = a; a = t1 + t2;
+    }
+
+    ctx->state[0] += a; ctx->state[1] += b; ctx->state[2] += c; ctx->state[3] += d;
+    ctx->state[4] += e; ctx->state[5] += f; ctx->state[6] += g; ctx->state[7] += h;
+}
+
+void sha256_init(SHA256_CTX *ctx) {
+    ctx->datalen = 0;
+    ctx->bitlen = 0;
+    ctx->state[0] = 0x6a09e667; ctx->state[1] = 0xbb67ae85;
+    ctx->state[2] = 0x3c6ef372; ctx->state[3] = 0xa54ff53a;
+    ctx->state[4] = 0x510e527f; ctx->state[5] = 0x9b05688c;
+    ctx->state[6] = 0x1f83d9ab; ctx->state[7] = 0x5be0cd19;
+}
+
+void sha256_update(SHA256_CTX *ctx, const uint8_t data[], size_t len) {
+    for (size_t i = 0; i < len; ++i) {
+        ctx->data[ctx->datalen] = data[i];
+        ctx->datalen++;
+        if (ctx->datalen == 64) {
+            sha256_transform(ctx, ctx->data);
+            ctx->bitlen += 512;
+            ctx->datalen = 0;
+        }
+    }
+}
+
+void sha256_final(SHA256_CTX *ctx, uint8_t hash[]) {
+    uint32_t i = ctx->datalen;
+    if (ctx->datalen < 56) {
+        ctx->data[i++] = 0x80;
+        while (i < 56) ctx->data[i++] = 0x00;
+    } else {
+        ctx->data[i++] = 0x80;
+        while (i < 64) ctx->data[i++] = 0x00;
+        sha256_transform(ctx, ctx->data);
+        memset(ctx->data, 0, 56);
+    }
+    ctx->bitlen += ctx->datalen * 8;
+    ctx->data[63] = ctx->bitlen; ctx->data[62] = ctx->bitlen >> 8;
+    ctx->data[61] = ctx->bitlen >> 16; ctx->data[60] = ctx->bitlen >> 24;
+    ctx->data[59] = ctx->bitlen >> 32; ctx->data[58] = ctx->bitlen >> 40;
+    ctx->data[57] = ctx->bitlen >> 48; ctx->data[56] = ctx->bitlen >> 56;
+    sha256_transform(ctx, ctx->data);
+    for (i = 0; i < 4; ++i) {
+        hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 4]  = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 8]  = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 20] = (ctx->state[5] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000ff;
+        hash[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000ff;
+    }
+}
+
+// ============================================================================
 // [5] ECDSA 서명 및 검증 로직
 // ============================================================================
 
@@ -497,67 +550,87 @@ typedef struct {
     BigInt s;
 } ECDSA_Signature;
 
+// (원래 있던 내부 서명 로직 - 해시값이 주어졌을 때)
 void ECDSA_Sign(ECDSA_Signature* sig, const BigInt* msg_hash, const BigInt* priv_key) {
     BigInt k, k_inv, r, s, temp, dr, e_plus_dr;
     EC_Point R;
 
     do {
-        // 1. 임의의 난수 k 생성 (1 <= k < n)
         EC_GeneratePrivateKey(&k);
-
-        // 2. R = k * G
         EC_Scalar_Mul(&R, &P256_G, &k, &P256_a, &P256_p);
-
-        // 3. r = R.x mod n
         BigInt_DivMod(NULL, &r, &R.x, &P256_n);
         
-        // r이 0이면 k를 다시 생성
         if (BigInt_IsZero(&r)) continue;
 
-        // 4. k_inv = k^-1 mod n
         ModInverse(&k_inv, &k, &P256_n);
-
-        // 5. s = k^-1 * (msg_hash + r * priv_key) mod n
         ModMul(&dr, &r, priv_key, &P256_n);
         ModAdd(&e_plus_dr, msg_hash, &dr, &P256_n);
         ModMul(&s, &k_inv, &e_plus_dr, &P256_n);
 
-    // s가 0이면 k를 다시 생성
     } while (BigInt_IsZero(&s));
 
     BigInt_Copy(&sig->r, &r);
     BigInt_Copy(&sig->s, &s);
 }
 
+// (원래 있던 내부 검증 로직)
 bool ECDSA_Verify(const ECDSA_Signature* sig, const BigInt* msg_hash, const EC_Point* pub_key) {
-    // 1. r과 s가 유효한 범위(1 ~ n-1) 내에 있는지 확인
     if (BigInt_IsZero(&sig->r) || BigInt_Compare(&sig->r, &P256_n) >= 0) return false;
     if (BigInt_IsZero(&sig->s) || BigInt_Compare(&sig->s, &P256_n) >= 0) return false;
 
     BigInt w, u1, u2, P_x_mod_n;
     EC_Point u1G, u2Q, P;
 
-    // 2. w = s^-1 mod n
     ModInverse(&w, &sig->s, &P256_n);
-
-    // 3. u1 = (msg_hash * w) mod n
     ModMul(&u1, msg_hash, &w, &P256_n);
-
-    // 4. u2 = (r * w) mod n
     ModMul(&u2, &sig->r, &w, &P256_n);
 
-    // 5. P = u1 * G + u2 * Q
     EC_Scalar_Mul(&u1G, &P256_G, &u1, &P256_a, &P256_p);
     EC_Scalar_Mul(&u2Q, pub_key, &u2, &P256_a, &P256_p);
     EC_Point_Add(&P, &u1G, &u2Q, &P256_a, &P256_p);
 
-    // 계산된 점이 무한원점이면 유효하지 않은 서명
     if (P.is_infinity) return false;
 
-    // 6. P.x mod n == r 인지 확인
     BigInt_DivMod(NULL, &P_x_mod_n, &P.x, &P256_n);
 
     return (BigInt_Compare(&P_x_mod_n, &sig->r) == 0);
+}
+
+// ----------------------------------------------------------------------------
+// [추가] 실제 메시지(문자열/파일)를 해시하여 서명/검증하는 Wrapper 함수
+// ----------------------------------------------------------------------------
+void ECDSA_Sign_Message(ECDSA_Signature* sig, const char* message, const BigInt* priv_key) {
+    SHA256_CTX ctx;
+    uint8_t hash[32];
+    BigInt msg_hash;
+
+    // 1. 메시지 해시
+    sha256_init(&ctx);
+    sha256_update(&ctx, (const uint8_t*)message, strlen(message));
+    sha256_final(&ctx, hash);
+
+    // 2. 해시 결과(32바이트)를 BigInt로 변환
+    BigInt_FromBytes(&msg_hash, hash, 32);
+
+    // 3. 서명 진행
+    ECDSA_Sign(sig, &msg_hash, priv_key);
+}
+
+bool ECDSA_Verify_Message(const ECDSA_Signature* sig, const char* message, const EC_Point* pub_key) {
+    SHA256_CTX ctx;
+    uint8_t hash[32];
+    BigInt msg_hash;
+
+    // 1. 메시지 해시
+    sha256_init(&ctx);
+    sha256_update(&ctx, (const uint8_t*)message, strlen(message));
+    sha256_final(&ctx, hash);
+
+    // 2. 해시 결과(32바이트)를 BigInt로 변환
+    BigInt_FromBytes(&msg_hash, hash, 32);
+
+    // 3. 검증 진행
+    return ECDSA_Verify(sig, &msg_hash, pub_key);
 }
 
 // ============================================================================
@@ -567,7 +640,7 @@ bool ECDSA_Verify(const ECDSA_Signature* sig, const BigInt* msg_hash, const EC_P
 int main() {
     EC_InitParameters();
 
-    printf("========== [ ECDSA 서명 및 검증 시뮬레이션 ] ==========\n\n");
+    printf("========== [ 실제 ECDSA 서명 및 검증 시뮬레이션 ] ==========\n\n");
 
     BigInt alice_priv;
     EC_Point alice_pub;
@@ -581,15 +654,14 @@ int main() {
     printf("Alice Public Key (X): "); BigInt_PrintHex(&alice_pub.x); printf("\n");
     printf("Alice Public Key (Y): "); BigInt_PrintHex(&alice_pub.y); printf("\n\n");
 
-    // 2. 전송할 메시지 해시 준비 (SHA-256 해시값이라고 가정)
-    BigInt msg_hash;
-    BigInt_FromHex(&msg_hash, "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD");
-    printf("Message Hash (가상): "); BigInt_PrintHex(&msg_hash); printf("\n\n");
+    // 2. 전송할 원본 메시지 준비
+    const char* original_message = "이것은 ECDSA로 보호되는 아주 중요한 원본 메시지입니다.";
+    printf("원본 메시지: \"%s\"\n\n", original_message);
 
-    // 3. 서명 생성 (Signing)
+    // 3. 서명 생성 (메시지 원본을 직접 서명)
     ECDSA_Signature signature;
     printf("서명 생성 중...\n");
-    ECDSA_Sign(&signature, &msg_hash, &alice_priv);
+    ECDSA_Sign_Message(&signature, original_message, &alice_priv);
     
     printf("생성된 서명 (Signature):\n");
     printf("    (r) "); BigInt_PrintHex(&signature.r); printf("\n");
@@ -597,7 +669,7 @@ int main() {
 
     // 4. 서명 검증 (Verification)
     printf("서명 검증 중...\n");
-    bool is_valid = ECDSA_Verify(&signature, &msg_hash, &alice_pub);
+    bool is_valid = ECDSA_Verify_Message(&signature, original_message, &alice_pub);
     
     if (is_valid) {
         printf("[SUCCESS] 서명이 유효합니다! (Alice가 작성한 메시지가 맞습니다.)\n\n");
@@ -606,11 +678,11 @@ int main() {
     }
 
     // 5. 서명 위변조 테스트
+    const char* fake_message = "이것은 해커가 변조한 가짜 메시지입니다.";
     printf("--- [조작된 메시지로 검증 시도] ---\n");
-    BigInt fake_hash;
-    BigInt_FromHex(&fake_hash, "DEADBEEF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD");
+    printf("조작된 메시지: \"%s\"\n", fake_message);
     
-    bool is_fake_valid = ECDSA_Verify(&signature, &fake_hash, &alice_pub);
+    bool is_fake_valid = ECDSA_Verify_Message(&signature, fake_message, &alice_pub);
     if (is_fake_valid) {
         printf("[에러] 조작된 메시지가 유효하다고 판별되었습니다!\n");
     } else {
