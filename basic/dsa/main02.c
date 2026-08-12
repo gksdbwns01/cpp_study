@@ -444,84 +444,150 @@ void EC_GeneratePrivateKey(BigInt* privKey) {
 // [5] ECDSA 서명 및 검증 로직
 // ============================================================================
 
+// ----------------------------------------------------------------------------
+// 1. ECDSA_Signature 구조체
+// 서명의 결과물은 항상 두 개의 거대한 숫자 r과 s로 이루어집니다.
+// ----------------------------------------------------------------------------
 typedef struct {
-    BigInt r;
-    BigInt s;
+    BigInt r; // 랜덤하게 생성된 타원곡선 점 R의 x좌표 값 (mod n)
+    BigInt s; // 개인키와 해시값, 그리고 r값을 이용해 계산된 검증용 값
 } ECDSA_Signature;
 
+
+// ----------------------------------------------------------------------------
+// 2. ECDSA_Sign 함수 (코어 서명 로직)
+// 해시된 메시지(msg_hash)와 개인키(priv_key)를 이용해 서명(r, s)을 생성합니다.
+// ----------------------------------------------------------------------------
 void ECDSA_Sign(ECDSA_Signature* sig, const BigInt* msg_hash, const BigInt* priv_key) {
-    BigInt k, k_inv, r, s, temp, dr, e_plus_dr;
+    BigInt k, k_inv, r, s, dr, e_plus_dr;
     EC_Point R;
 
+    // r이나 s가 0이 나오면 극히 희박한 확률로 서명이 실패한 것이므로 다시 시도해야 합니다.
     do {
+        // [단계 1] 임시 개인키(Nonce) k 생성 (1부터 n-1 사이의 안전한 난수)
         EC_GeneratePrivateKey(&k);
+        
+        // [단계 2] 임시 공개키 R 계산 (R = k * G)
+        // 생성점 G를 k번 더해서 타원곡선 위의 점 R을 구합니다.
         EC_Scalar_Mul(&R, &P256_G, &k, &P256_a, &P256_p);
+        
+        // [단계 3] 서명의 첫 번째 값 'r' 계산 (r = R의 x좌표 mod n)
+        // 타원곡선의 위수(Order)인 P256_n으로 나눈 나머지를 구합니다.
         BigInt_DivMod(NULL, &r, &R.x, &P256_n);
         
+        // r이 0이면 서명에 사용할 수 없으므로 k부터 다시 생성합니다.
         if (BigInt_IsZero(&r)) continue;
 
+        // [단계 4] 서명의 두 번째 값 's' 계산
+        // 공식: s = k^-1 * (msg_hash + r * priv_key) mod n
+        
+        // 4-1. k의 모듈러 역원(k^-1 mod n)을 구합니다.
         ModInverse(&k_inv, &k, &P256_n);
+        
+        // 4-2. dr = r * priv_key (mod n) 계산
         ModMul(&dr, &r, priv_key, &P256_n);
+        
+        // 4-3. e_plus_dr = msg_hash + (r * priv_key) (mod n) 계산
         ModAdd(&e_plus_dr, msg_hash, &dr, &P256_n);
+        
+        // 4-4. s = k_inv * e_plus_dr (mod n) 계산 완료
         ModMul(&s, &k_inv, &e_plus_dr, &P256_n);
 
+    // 극히 희박하지만 s가 0이 나오면 서명 규칙 위반이므로 k부터 다시 시도합니다.
     } while (BigInt_IsZero(&s));
 
+    // [단계 5] 계산된 r과 s를 서명 구조체에 복사하여 반환
     BigInt_Copy(&sig->r, &r);
     BigInt_Copy(&sig->s, &s);
 }
 
+
+// ----------------------------------------------------------------------------
+// 3. ECDSA_Verify 함수 (코어 검증 로직)
+// 해시된 메시지, 서명(r, s), 그리고 서명자의 공개키(pub_key)를 이용해 서명을 검증합니다.
+// ----------------------------------------------------------------------------
 bool ECDSA_Verify(const ECDSA_Signature* sig, const BigInt* msg_hash, const EC_Point* pub_key) {
+    // [단계 1] 기본 유효성 검사
+    // r과 s는 0보다 커야 하고, 타원곡선 위수(n)보다 작아야 합니다. (1 <= r, s < n)
     if (BigInt_IsZero(&sig->r) || BigInt_Compare(&sig->r, &P256_n) >= 0) return false;
     if (BigInt_IsZero(&sig->s) || BigInt_Compare(&sig->s, &P256_n) >= 0) return false;
 
     BigInt w, u1, u2, P_x_mod_n;
     EC_Point u1G, u2Q, P;
 
+    // [단계 2] s의 모듈러 역원(w) 계산
+    // w = s^-1 mod n
     ModInverse(&w, &sig->s, &P256_n);
+    
+    // [단계 3] u1 계산
+    // u1 = (msg_hash * w) mod n
     ModMul(&u1, msg_hash, &w, &P256_n);
+    
+    // [단계 4] u2 계산
+    // u2 = (r * w) mod n
     ModMul(&u2, &sig->r, &w, &P256_n);
 
+    // [단계 5] 타원곡선 점 P 복원
+    // P = (u1 * G) + (u2 * pub_key)
+    
+    // 5-1. u1 * G 계산 (생성점에 u1을 스칼라 곱)
     EC_Scalar_Mul(&u1G, &P256_G, &u1, &P256_a, &P256_p);
+    
+    // 5-2. u2 * pub_key 계산 (공개키에 u2를 스칼라 곱)
     EC_Scalar_Mul(&u2Q, pub_key, &u2, &P256_a, &P256_p);
+    
+    // 5-3. 두 점을 더해 P를 구함 (P = u1G + u2Q)
     EC_Point_Add(&P, &u1G, &u2Q, &P256_a, &P256_p);
 
+    // 만약 계산된 점 P가 무한원점(Infinity)이라면 잘못된 서명입니다.
     if (P.is_infinity) return false;
 
+    // [단계 6] P의 x좌표를 mod n 한 값 구하기
     BigInt_DivMod(NULL, &P_x_mod_n, &P.x, &P256_n);
 
+    // [최종 단계] 복원된 x좌표(P_x_mod_n)가 서명의 r 값과 일치하는지 확인
+    // 일치하면 true(유효한 서명), 다르면 false(위조된 서명) 반환
     return (BigInt_Compare(&P_x_mod_n, &sig->r) == 0);
 }
 
+
 // ----------------------------------------------------------------------------
-// [추가] 실제 메시지(문자열/파일)를 해시하여 서명/검증하는 Wrapper 함수
-// OpenSSL을 사용하도록 수정됨
+// 4. ECDSA_Sign_Message 함수 (래퍼 함수)
+// 일반 문자열(message)을 받아 직접 SHA-256 해시 후 서명하는 편의용 함수
 // ----------------------------------------------------------------------------
 void ECDSA_Sign_Message(ECDSA_Signature* sig, const char* message, const BigInt* priv_key) {
-    uint8_t hash[SHA256_DIGEST_LENGTH]; // OpenSSL이 제공하는 상수 (32바이트)
+    // SHA256_DIGEST_LENGTH는 OpenSSL에 정의된 상수(32)입니다.
+    uint8_t hash[SHA256_DIGEST_LENGTH]; 
     BigInt msg_hash;
 
-    // 1. 메시지 해시 (OpenSSL SHA256 사용)
+    // 1. OpenSSL 라이브러리를 이용해 문자열을 SHA-256으로 해시합니다.
+    // 결과는 32바이트 길이의 hash 배열에 저장됩니다.
     SHA256((const unsigned char*)message, strlen(message), hash);
 
-    // 2. 해시 결과(32바이트)를 BigInt로 변환
+    // 2. 32바이트 해시 배열(uint8_t 배열)을 우리가 만든 BigInt 구조체로 변환합니다.
     BigInt_FromBytes(&msg_hash, hash, SHA256_DIGEST_LENGTH);
 
-    // 3. 서명 진행
+    // 3. 변환된 BigInt 해시값과 개인키를 코어 서명 함수로 넘겨 실제 서명을 수행합니다.
     ECDSA_Sign(sig, &msg_hash, priv_key);
 }
 
+
+// ----------------------------------------------------------------------------
+// 5. ECDSA_Verify_Message 함수 (래퍼 함수)
+// 일반 문자열(message)의 서명 유효성을 곧바로 검증하는 편의용 함수
+// ----------------------------------------------------------------------------
 bool ECDSA_Verify_Message(const ECDSA_Signature* sig, const char* message, const EC_Point* pub_key) {
     uint8_t hash[SHA256_DIGEST_LENGTH];
     BigInt msg_hash;
 
-    // 1. 메시지 해시 (OpenSSL SHA256 사용)
+    // 1. 검증할 문자열 원본을 OpenSSL로 다시 SHA-256 해시합니다.
     SHA256((const unsigned char*)message, strlen(message), hash);
 
-    // 2. 해시 결과(32바이트)를 BigInt로 변환
+    // 2. 해시 결과(32바이트 배열)를 BigInt 구조체로 변환합니다.
     BigInt_FromBytes(&msg_hash, hash, SHA256_DIGEST_LENGTH);
 
-    // 3. 검증 진행
+    // 3. 변환된 BigInt 해시값, 넘겨받은 서명(sig), 공개키를 코어 검증 함수로 넘겨 검사합니다.
+    // 검증 결과(참/거짓)를 그대로 반환합니다.
     return ECDSA_Verify(sig, &msg_hash, pub_key);
 }
 
