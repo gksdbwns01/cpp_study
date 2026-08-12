@@ -12,3 +12,7 @@ main02.c
 /usr/bin/g++ -fdiagnostics-color=always -g /home/gksdbwns/cpp_study/basic/dsa/main02.c -o /home/gksdbwns/cpp_study/basic/dsa/main02 -loqs -lcrypto
 /home/gksdbwns/cpp_study/basic/dsa/main02
 
+main03.c
+같은 k를 사용했을 경우
+/usr/bin/g++ -fdiagnostics-color=always -g /home/gksdbwns/cpp_study/basic/dsa/main03.c -o /home/gksdbwns/cpp_study/basic/dsa/main03 -loqs -lcrypto
+/home/gksdbwns/cpp_study/basic/dsa/main03

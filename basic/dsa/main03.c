@@ -592,191 +592,103 @@ bool ECDSA_Verify_Message(const ECDSA_Signature* sig, const char* message, const
 }
 
 // ============================================================================
-// [6] main() 함수
+// [6] main() 함수 - k 재사용(k-reuse) 취약점 시뮬레이션
 // ============================================================================
 
 int main() {
     EC_InitParameters();
 
     printf("=================================================================\n");
-    printf("                  [ ECDSA 서명 및 검증 (SHA256) ]                  \n");
+    printf("             [ ECDSA 동일한 k 사용 시의 취약점 (k-reuse) ]             \n");
     printf("=================================================================\n\n");
 
     BigInt alice_priv;
     EC_Point alice_pub;
-    
+
     // 1. Alice 키 쌍 생성
     EC_GeneratePrivateKey(&alice_priv);
     EC_Scalar_Mul(&alice_pub, &P256_G, &alice_priv, &P256_a, &P256_p);
 
-    printf("Alice 키 쌍 생성 완료\n");
-    printf("  - Private Key : "); BigInt_PrintHex(&alice_priv); printf("\n");
-    printf("  - Public Key X: "); BigInt_PrintHex(&alice_pub.x); printf("\n");
-    printf("  - Public Key Y: "); BigInt_PrintHex(&alice_pub.y); printf("\n\n");
+    printf("[1] Alice의 실제 개인키 생성 완료\n");
+    printf("  - Private Key (d) : "); BigInt_PrintHex(&alice_priv); printf("\n\n");
 
-    // 2. 전송할 원본 메시지 준비
-    const char* original_message = "ECDSA 원본 메시지";
+    // 2. 취약점 시뮬레이션: 고정된 k 사용
+    BigInt k;
+    EC_GeneratePrivateKey(&k); // 난수지만 두 번의 서명에 '동일하게' 사용할 예정
     
-    // 3. 서명 생성
-    ECDSA_Signature signature;
-    ECDSA_Sign_Message(&signature, original_message, &alice_priv);
-    
-    printf("서명 생성 완료\n");
-    printf("  - 원본 메시지 : \"%s\"\n", original_message);
-    printf("  - Signature r : "); BigInt_PrintHex(&signature.r); printf("\n");
-    printf("  - Signature s : "); BigInt_PrintHex(&signature.s); printf("\n\n");
+    printf("[2] 고정된 임시 키(k) 선택 (재사용될 예정)\n");
+    printf("  - k               : "); BigInt_PrintHex(&k); printf("\n\n");
 
-    // 4. 서명 검증 상세 과정
-    printf("메인 함수 내부 검증 과정\n");
-    
-    uint8_t hash[SHA256_DIGEST_LENGTH];
-    SHA256((const unsigned char*)original_message, strlen(original_message), hash);
-    
-    BigInt msg_hash;
-    BigInt_FromBytes(&msg_hash, hash, SHA256_DIGEST_LENGTH);
-    printf("  - Message Hash: "); BigInt_PrintHex(&msg_hash); printf("\n");
+    // 3. 두 개의 다른 메시지 준비 및 해시
+    const char* msg1 = "Message 1: Transfer $10 to Bob";
+    const char* msg2 = "Message 2: Transfer $100 to Eve";
 
-    BigInt w, u1, u2, P_x_mod_n;
-    EC_Point u1G, u2Q, P;
+    uint8_t hash1_bytes[SHA256_DIGEST_LENGTH];
+    uint8_t hash2_bytes[SHA256_DIGEST_LENGTH];
+    SHA256((const unsigned char*)msg1, strlen(msg1), hash1_bytes);
+    SHA256((const unsigned char*)msg2, strlen(msg2), hash2_bytes);
 
-    ModInverse(&w, &signature.s, &P256_n);
-    printf("  - w (s^-1)    : "); BigInt_PrintHex(&w); printf("\n");
+    BigInt h1, h2;
+    BigInt_FromBytes(&h1, hash1_bytes, SHA256_DIGEST_LENGTH);
+    BigInt_FromBytes(&h2, hash2_bytes, SHA256_DIGEST_LENGTH);
 
-    ModMul(&u1, &msg_hash, &w, &P256_n);
-    printf("  - u1 (hash*w) : "); BigInt_PrintHex(&u1); printf("\n");
+    // 4. 서명 직접 계산 (두 서명 모두 같은 k 사용)
+    BigInt r, s1, s2, k_inv, dr, temp1, temp2;
+    EC_Point R;
 
-    ModMul(&u2, &signature.r, &w, &P256_n);
-    printf("  - u2 (r*w)    : "); BigInt_PrintHex(&u2); printf("\n\n");
+    // r 계산: R = k*G, r = R.x mod n
+    EC_Scalar_Mul(&R, &P256_G, &k, &P256_a, &P256_p);
+    BigInt_DivMod(NULL, &r, &R.x, &P256_n);
 
-    EC_Scalar_Mul(&u1G, &P256_G, &u1, &P256_a, &P256_p);
-    EC_Scalar_Mul(&u2Q, &alice_pub, &u2, &P256_a, &P256_p);
-    EC_Point_Add(&P, &u1G, &u2Q, &P256_a, &P256_p);
-    
-    BigInt_DivMod(NULL, &P_x_mod_n, &P.x, &P256_n);
-    
-    printf("  [최종 검증 대조]\n");
-    printf("  => 복원된 P의 x좌표: "); BigInt_PrintHex(&P_x_mod_n); printf("\n");
-    printf("  => 원본 서명의 r 값: "); BigInt_PrintHex(&signature.r); printf("\n");
-    
-    if (BigInt_Compare(&P_x_mod_n, &signature.r) == 0) {
-        printf("  [SUCCESS] 서명이 유효합니다! (Alice가 작성한 메시지)\n\n");
+    ModInverse(&k_inv, &k, &P256_n);
+    ModMul(&dr, &r, &alice_priv, &P256_n); // r * d
+
+    // s1 계산: s1 = k^-1 * (h1 + r*d) mod n
+    ModAdd(&temp1, &h1, &dr, &P256_n);
+    ModMul(&s1, &k_inv, &temp1, &P256_n);
+
+    // s2 계산: s2 = k^-1 * (h2 + r*d) mod n
+    ModAdd(&temp2, &h2, &dr, &P256_n);
+    ModMul(&s2, &k_inv, &temp2, &P256_n);
+
+    printf("[3] 동일한 k로 두 개의 다른 메시지 서명 진행\n");
+    printf("  - 서명 1 (msg1) r : "); BigInt_PrintHex(&r); printf("\n");
+    printf("  - 서명 1 (msg1) s1: "); BigInt_PrintHex(&s1); printf("\n");
+    printf("  - 서명 2 (msg2) r : "); BigInt_PrintHex(&r); printf("\n");
+    printf("  - 서명 2 (msg2) s2: "); BigInt_PrintHex(&s2); printf("\n");
+    printf("  => 주의! 동일한 k를 사용했기 때문에 두 서명의 'r' 값이 완벽히 일치합니다.\n\n");
+
+    // 5. 해커의 공격: 개인키(d) 탈취 과정
+    printf("[4] 해커의 개인키(d) 탈취 공격 (k-reuse attack)\n");
+
+    BigInt diff_s, diff_s_inv, diff_h, recovered_k;
+    BigInt s1_k, s1_k_minus_h1, r_inv, recovered_d;
+
+    // (1) k 복구: k = (h1 - h2) * (s1 - s2)^-1 mod n
+    ModSub(&diff_s, &s1, &s2, &P256_n);
+    ModSub(&diff_h, &h1, &h2, &P256_n);
+    ModInverse(&diff_s_inv, &diff_s, &P256_n);
+    ModMul(&recovered_k, &diff_h, &diff_s_inv, &P256_n);
+
+    printf("  - 해커가 계산해낸 k : "); BigInt_PrintHex(&recovered_k); printf("\n");
+
+    // (2) d 복구: d = (s1*k - h1) * r^-1 mod n
+    ModMul(&s1_k, &s1, &recovered_k, &P256_n);
+    ModSub(&s1_k_minus_h1, &s1_k, &h1, &P256_n);
+    ModInverse(&r_inv, &r, &P256_n);
+    ModMul(&recovered_d, &r_inv, &s1_k_minus_h1, &P256_n);
+
+    printf("  - 해커가 계산해낸 d : "); BigInt_PrintHex(&recovered_d); printf("\n\n");
+
+    // 6. 결과 확인
+    printf("[5] 최종 결과 비교\n");
+    if (BigInt_Compare(&alice_priv, &recovered_d) == 0) {
+        printf("  [FATAL ERROR] 해커가 복구한 개인키가 Alice의 실제 개인키와 100%% 일치합니다!\n");
+        // 단 한 번의 k 재사용만으로 개인키가 탈취됨
     } else {
-        printf("  [FAILED] 서명 검증에 실패했습니다.\n\n");
+        printf("  [SAFE] 개인키 복구에 실패했습니다.\n");
     }
-
-    // 5. 서명 위변조 테스트
-    const char* fake_message = "해커가 변조한 가짜 메시지";
-    printf("-----------------------------------------------------------------\n");
-    printf("서명 위변조 테스트 (조작된 메시지로 시도)\n");
-    printf("  - 조작된 메시지 : \"%s\"\n", fake_message);
     
-    uint8_t fake_hash_bytes[SHA256_DIGEST_LENGTH];
-    SHA256((const unsigned char*)fake_message, strlen(fake_message), fake_hash_bytes);
-    BigInt fake_hash;
-    BigInt_FromBytes(&fake_hash, fake_hash_bytes, SHA256_DIGEST_LENGTH);
-    printf("  - Fake Hash     : "); BigInt_PrintHex(&fake_hash); printf("\n");
-    
-    ModMul(&u1, &fake_hash, &w, &P256_n); 
-    printf("  - 새로운 u1     : "); BigInt_PrintHex(&u1); printf("\n\n");
-
-    EC_Scalar_Mul(&u1G, &P256_G, &u1, &P256_a, &P256_p);
-    EC_Point_Add(&P, &u1G, &u2Q, &P256_a, &P256_p);
-    BigInt_DivMod(NULL, &P_x_mod_n, &P.x, &P256_n);
-    
-    printf("  [위변조 검증 대조]\n");
-    printf("  => 복원된 P의 x좌표: "); BigInt_PrintHex(&P_x_mod_n); printf("\n");
-    printf("  => 원본 서명의 r 값: "); BigInt_PrintHex(&signature.r); printf("\n");
-    
-    if (BigInt_Compare(&P_x_mod_n, &signature.r) == 0) {
-        printf("  [ERROR] 조작된 메시지가 유효하다고 판별되었습니다!\n");
-    } else {
-        printf("  [SUCCESS] 위변조 감지! 복원된 x값이 원본 r과 달라 검증에 실패했습니다.\n");
-    }
-    printf("=================================================================\n");
-
-    // ============================================================================
-    // [추가 테스트] 키(Key) 위변조 및 불일치 상세 과정 테스트
-    // ============================================================================
-    printf("\n=================================================================\n");
-    printf("            [ 추가 키 불일치 방어 테스트 (중간 과정 포함) ]            \n");
-    printf("=================================================================\n\n");
-
-    // Bob의 키 쌍 생성 (타인)
-    BigInt bob_priv;
-    EC_Point bob_pub;
-    EC_GeneratePrivateKey(&bob_priv);
-    EC_Scalar_Mul(&bob_pub, &P256_G, &bob_priv, &P256_a, &P256_p);
-    
-    printf("Bob 키 쌍 생성 완료 (타인)\n");
-    printf("  - Bob Public Key X: "); BigInt_PrintHex(&bob_pub.x); printf("\n\n");
-
-    // ----------------------------------------------------------------------------
-    // 테스트 A: Alice의 서명을 Bob의 공개키로 검증 시도
-    // ----------------------------------------------------------------------------
-    printf("-----------------------------------------------------------------\n");
-    printf("테스트 A: 올바른 서명을 '다른 사람(Bob)의 공개키'로 검증 시도\n");
-    
-    // msg_hash, w, u1, u2는 Alice의 서명(signature)과 원본 메시지를 기반으로 하므로 기존 값을 그대로 씁니다.
-    // 하지만 타원곡선 점을 더할 때 alice_pub가 아닌 bob_pub를 사용하게 됩니다.
-    EC_Point u2Q_bob, P_testA;
-    BigInt P_x_mod_n_testA;
-
-    EC_Scalar_Mul(&u2Q_bob, &bob_pub, &u2, &P256_a, &P256_p); // Bob의 공개키 사용
-    EC_Point_Add(&P_testA, &u1G, &u2Q_bob, &P256_a, &P256_p);
-    BigInt_DivMod(NULL, &P_x_mod_n_testA, &P_testA.x, &P256_n);
-
-    printf("  [공개키 불일치 검증 대조]\n");
-    printf("  => Bob의 공개키로 복원된 P의 x좌표: "); BigInt_PrintHex(&P_x_mod_n_testA); printf("\n");
-    printf("  => 원본 서명의 r 값               : "); BigInt_PrintHex(&signature.r); printf("\n");
-
-    if (BigInt_Compare(&P_x_mod_n_testA, &signature.r) == 0) {
-        printf("  [ERROR] 잘못된 공개키인데 검증이 통과되었습니다!\n\n");
-    } else {
-        printf("  [SUCCESS] 복원된 x값이 원본 r과 다릅니다. (잘못된 공개키 방어 성공)\n\n");
-    }
-
-    // ----------------------------------------------------------------------------
-    // 테스트 B: Bob이 서명한 가짜 서명을 Alice의 공개키로 검증 시도
-    // ----------------------------------------------------------------------------
-    printf("-----------------------------------------------------------------\n");
-    printf("테스트 B: 다른 사람(Bob)이 생성한 서명을 'Alice의 공개키'로 검증 시도\n");
-
-    // Bob이 자신의 개인키로 원본 메시지에 서명합니다.
-    ECDSA_Signature bob_signature;
-    ECDSA_Sign_Message(&bob_signature, original_message, &bob_priv);
-    
-    printf("  - Bob이 생성한 Signature r : "); BigInt_PrintHex(&bob_signature.r); printf("\n");
-    printf("  - Bob이 생성한 Signature s : "); BigInt_PrintHex(&bob_signature.s); printf("\n\n");
-
-    // Bob의 서명값을 바탕으로 새로운 w, u1, u2를 계산합니다.
-    BigInt w_bob, u1_bob, u2_bob, P_x_mod_n_testB;
-    EC_Point u1G_bob, u2Q_alice, P_testB;
-
-    ModInverse(&w_bob, &bob_signature.s, &P256_n);
-    printf("  - 새로운 w (Bob s^-1): "); BigInt_PrintHex(&w_bob); printf("\n");
-
-    ModMul(&u1_bob, &msg_hash, &w_bob, &P256_n);
-    printf("  - 새로운 u1          : "); BigInt_PrintHex(&u1_bob); printf("\n");
-
-    ModMul(&u2_bob, &bob_signature.r, &w_bob, &P256_n);
-    printf("  - 새로운 u2          : "); BigInt_PrintHex(&u2_bob); printf("\n\n");
-
-    // Alice의 공개키를 사용하여 검증을 시도합니다.
-    EC_Scalar_Mul(&u1G_bob, &P256_G, &u1_bob, &P256_a, &P256_p);
-    EC_Scalar_Mul(&u2Q_alice, &alice_pub, &u2_bob, &P256_a, &P256_p); // Alice 공개키 적용
-    EC_Point_Add(&P_testB, &u1G_bob, &u2Q_alice, &P256_a, &P256_p);
-    
-    BigInt_DivMod(NULL, &P_x_mod_n_testB, &P_testB.x, &P256_n);
-
-    printf("  [서명자 위조 검증 대조]\n");
-    printf("  => Alice공개키로 복원된 P의 x좌표: "); BigInt_PrintHex(&P_x_mod_n_testB); printf("\n");
-    printf("  => Bob 서명의 r 값               : "); BigInt_PrintHex(&bob_signature.r); printf("\n");
-
-    if (BigInt_Compare(&P_x_mod_n_testB, &bob_signature.r) == 0) {
-        printf("  [ERROR] 타인의 서명이 유효하다고 판별되었습니다!\n");
-    } else {
-        printf("  [SUCCESS] 복원된 x값이 Bob의 r과 다릅니다. (위조 서명 방어 성공)\n");
-    }
     printf("=================================================================\n");
     return 0;
 }
