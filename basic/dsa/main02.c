@@ -598,54 +598,101 @@ bool ECDSA_Verify_Message(const ECDSA_Signature* sig, const char* message, const
 int main() {
     EC_InitParameters();
 
-    printf("========== [ ECDSA 서명 및 검증 (SHA256) ] ==========\n\n");
+    printf("=================================================================\n");
+    printf("                  [ ECDSA 서명 및 검증 (SHA256) ]                  \n");
+    printf("=================================================================\n\n");
 
     BigInt alice_priv;
     EC_Point alice_pub;
     
     // 1. Alice 키 쌍 생성
-    printf("Alice 키 생성 중...\n");
     EC_GeneratePrivateKey(&alice_priv);
     EC_Scalar_Mul(&alice_pub, &P256_G, &alice_priv, &P256_a, &P256_p);
 
-    printf("Alice Private Key: "); BigInt_PrintHex(&alice_priv); printf("\n");
-    printf("Alice Public Key (X): "); BigInt_PrintHex(&alice_pub.x); printf("\n");
-    printf("Alice Public Key (Y): "); BigInt_PrintHex(&alice_pub.y); printf("\n\n");
+    printf("Alice 키 쌍 생성 완료\n");
+    printf("  - Private Key : "); BigInt_PrintHex(&alice_priv); printf("\n");
+    printf("  - Public Key X: "); BigInt_PrintHex(&alice_pub.x); printf("\n");
+    printf("  - Public Key Y: "); BigInt_PrintHex(&alice_pub.y); printf("\n\n");
 
     // 2. 전송할 원본 메시지 준비
     const char* original_message = "ECDSA 원본 메시지";
-    printf("원본 메시지: \"%s\"\n\n", original_message);
-
-    // 3. 서명 생성 (메시지 원본을 직접 서명)
+    
+    // 3. 서명 생성
     ECDSA_Signature signature;
-    printf("서명 생성 중...\n");
     ECDSA_Sign_Message(&signature, original_message, &alice_priv);
     
-    printf("생성된 서명 (Signature):\n");
-    printf("    (r) "); BigInt_PrintHex(&signature.r); printf("\n");
-    printf("    (s) "); BigInt_PrintHex(&signature.s); printf("\n\n");
+    printf("서명 생성 완료\n");
+    printf("  - 원본 메시지 : \"%s\"\n", original_message);
+    printf("  - Signature r : "); BigInt_PrintHex(&signature.r); printf("\n");
+    printf("  - Signature s : "); BigInt_PrintHex(&signature.s); printf("\n\n");
 
-    // 4. 서명 검증 (Verification)
-    printf("서명 검증 중...\n");
-    bool is_valid = ECDSA_Verify_Message(&signature, original_message, &alice_pub);
+    // 4. 서명 검증 상세 과정
+    printf("메인 함수 내부 검증 과정\n");
     
-    if (is_valid) {
-        printf("[SUCCESS] 서명이 유효합니다! (Alice가 작성한 메시지가 맞습니다.)\n\n");
+    uint8_t hash[SHA256_DIGEST_LENGTH];
+    SHA256((const unsigned char*)original_message, strlen(original_message), hash);
+    
+    BigInt msg_hash;
+    BigInt_FromBytes(&msg_hash, hash, SHA256_DIGEST_LENGTH);
+    printf("  - Message Hash: "); BigInt_PrintHex(&msg_hash); printf("\n");
+
+    BigInt w, u1, u2, P_x_mod_n;
+    EC_Point u1G, u2Q, P;
+
+    ModInverse(&w, &signature.s, &P256_n);
+    printf("  - w (s^-1)    : "); BigInt_PrintHex(&w); printf("\n");
+
+    ModMul(&u1, &msg_hash, &w, &P256_n);
+    printf("  - u1 (hash*w) : "); BigInt_PrintHex(&u1); printf("\n");
+
+    ModMul(&u2, &signature.r, &w, &P256_n);
+    printf("  - u2 (r*w)    : "); BigInt_PrintHex(&u2); printf("\n\n");
+
+    EC_Scalar_Mul(&u1G, &P256_G, &u1, &P256_a, &P256_p);
+    EC_Scalar_Mul(&u2Q, &alice_pub, &u2, &P256_a, &P256_p);
+    EC_Point_Add(&P, &u1G, &u2Q, &P256_a, &P256_p);
+    
+    BigInt_DivMod(NULL, &P_x_mod_n, &P.x, &P256_n);
+    
+    printf("  [최종 검증 대조]\n");
+    printf("  => 복원된 P의 x좌표: "); BigInt_PrintHex(&P_x_mod_n); printf("\n");
+    printf("  => 원본 서명의 r 값: "); BigInt_PrintHex(&signature.r); printf("\n");
+    
+    if (BigInt_Compare(&P_x_mod_n, &signature.r) == 0) {
+        printf("  [SUCCESS] 서명이 유효합니다! (Alice가 작성한 메시지)\n\n");
     } else {
-        printf("[FAILED] 서명 검증에 실패했습니다.\n\n");
+        printf("  [FAILED] 서명 검증에 실패했습니다.\n\n");
     }
 
     // 5. 서명 위변조 테스트
     const char* fake_message = "해커가 변조한 가짜 메시지";
-    printf("--- [조작된 메시지로 검증 시도] ---\n");
-    printf("조작된 메시지: \"%s\"\n", fake_message);
+    printf("-----------------------------------------------------------------\n");
+    printf("서명 위변조 테스트 (조작된 메시지로 시도)\n");
+    printf("  - 조작된 메시지 : \"%s\"\n", fake_message);
     
-    bool is_fake_valid = ECDSA_Verify_Message(&signature, fake_message, &alice_pub);
-    if (is_fake_valid) {
-        printf("[에러] 조작된 메시지가 유효하다고 판별되었습니다!\n");
+    uint8_t fake_hash_bytes[SHA256_DIGEST_LENGTH];
+    SHA256((const unsigned char*)fake_message, strlen(fake_message), fake_hash_bytes);
+    BigInt fake_hash;
+    BigInt_FromBytes(&fake_hash, fake_hash_bytes, SHA256_DIGEST_LENGTH);
+    printf("  - Fake Hash     : "); BigInt_PrintHex(&fake_hash); printf("\n");
+    
+    ModMul(&u1, &fake_hash, &w, &P256_n); 
+    printf("  - 새로운 u1     : "); BigInt_PrintHex(&u1); printf("\n\n");
+
+    EC_Scalar_Mul(&u1G, &P256_G, &u1, &P256_a, &P256_p);
+    EC_Point_Add(&P, &u1G, &u2Q, &P256_a, &P256_p);
+    BigInt_DivMod(NULL, &P_x_mod_n, &P.x, &P256_n);
+    
+    printf("  [위변조 검증 대조]\n");
+    printf("  => 복원된 P의 x좌표: "); BigInt_PrintHex(&P_x_mod_n); printf("\n");
+    printf("  => 원본 서명의 r 값: "); BigInt_PrintHex(&signature.r); printf("\n");
+    
+    if (BigInt_Compare(&P_x_mod_n, &signature.r) == 0) {
+        printf("  [ERROR] 조작된 메시지가 유효하다고 판별되었습니다!\n");
     } else {
-        printf("[SUCCESS] 조작된 메시지의 서명 검증이 정상적으로 실패했습니다.\n");
+        printf("  [SUCCESS] 위변조 감지! 복원된 x값이 원본 r과 달라 검증에 실패했습니다.\n");
     }
+    printf("=================================================================\n");
 
     return 0;
 }
