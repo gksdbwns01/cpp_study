@@ -598,9 +598,9 @@ bool ECDSA_Verify_Message(const ECDSA_Signature* sig, const char* message, const
 int main() {
     EC_InitParameters();
 
-    printf("=================================================================\n");
-    printf("             [ ECDSA 동일한 k 사용 시의 취약점 (k-reuse) ]             \n");
-    printf("=================================================================\n\n");
+    printf("===========================================================\n");
+    printf("             [ ECDSA 동일한 k 사용 시의 취약점 ]             \n");
+    printf("===========================================================\n\n");
 
     BigInt alice_priv;
     EC_Point alice_pub;
@@ -614,14 +614,14 @@ int main() {
 
     // 2. 취약점 시뮬레이션: 고정된 k 사용
     BigInt k;
-    EC_GeneratePrivateKey(&k); // 난수지만 두 번의 서명에 '동일하게' 사용할 예정
+    EC_GeneratePrivateKey(&k); // 난수지만 두 번의 서명에 동일하게 사용할 예정
     
     printf("[2] 고정된 임시 키(k) 선택 (재사용될 예정)\n");
     printf("  - k               : "); BigInt_PrintHex(&k); printf("\n\n");
 
     // 3. 두 개의 다른 메시지 준비 및 해시
-    const char* msg1 = "Message 1: Transfer $10 to Bob";
-    const char* msg2 = "Message 2: Transfer $100 to Eve";
+    const char* msg1 = "첫 번째 메시지: Alice에게 100원 송금";
+    const char* msg2 = "두 번째 메시지: Bob에게 100원 송금";
 
     uint8_t hash1_bytes[SHA256_DIGEST_LENGTH];
     uint8_t hash2_bytes[SHA256_DIGEST_LENGTH];
@@ -656,7 +656,7 @@ int main() {
     printf("  - 서명 1 (msg1) s1: "); BigInt_PrintHex(&s1); printf("\n");
     printf("  - 서명 2 (msg2) r : "); BigInt_PrintHex(&r); printf("\n");
     printf("  - 서명 2 (msg2) s2: "); BigInt_PrintHex(&s2); printf("\n");
-    printf("  => 주의! 동일한 k를 사용했기 때문에 두 서명의 'r' 값이 완벽히 일치합니다.\n\n");
+    printf("  => 주의. 동일한 k를 사용했기 때문에 두 서명의 'r' 값이 완벽히 일치합니다.\n\n");
 
     // 5. 해커의 공격: 개인키(d) 탈취 과정
     printf("[4] 해커의 개인키(d) 탈취 공격 (k-reuse attack)\n");
@@ -683,7 +683,7 @@ int main() {
     // 6. 결과 확인
     printf("[5] 최종 결과 비교\n");
     if (BigInt_Compare(&alice_priv, &recovered_d) == 0) {
-        printf("  [FATAL ERROR] 해커가 복구한 개인키가 Alice의 실제 개인키와 100%% 일치합니다!\n");
+        printf("  [FATAL ERROR] 해커가 복구한 개인키가 Alice의 실제 개인키와 일치합니다\n");
         // 단 한 번의 k 재사용만으로 개인키가 탈취됨
     } else {
         printf("  [SAFE] 개인키 복구에 실패했습니다.\n");
