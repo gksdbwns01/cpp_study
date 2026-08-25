@@ -1,0 +1,138 @@
+stages:
+  - build
+  - packaging
+
+# When a new commit is pushed to a branch, cancel the superseded pipeline,
+# including jobs that are already running (every job below is interruptible).
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
+# Mark every job interruptible so redundant in-progress jobs are cancelled.
+default:
+  interruptible: true
+
+.base-build:
+  stage: build
+  image: ubuntu:22.04
+  script:
+    - apt update
+    - DEBIAN_FRONTEND=noninteractive apt install -y g++ ninja-build cmake $QT_LIBRARY_PACKAGE
+    - cmake -B cmake-cache
+    - cmake --build cmake-cache
+
+qt5-build:
+  extends: .base-build
+  variables:
+    QT_LIBRARY_PACKAGE: qtbase5-dev
+
+qt6-build:
+  extends: .base-build
+  variables:
+    QT_LIBRARY_PACKAGE: qt6-base-dev libglvnd-dev libqt6svg6-dev # qt6-svg-dev in newer ubuntu releases
+
+packaging-linux:
+  stage: packaging
+  image: ubuntu:22.04
+  variables:
+    QT_VERSION: "6.9.2"
+    QT_ARCH: "linux_gcc_64"
+    # aqt unpacks the toolkit to <output>/<version>/gcc_64.
+    QT_DIR: "/opt/Qt/6.9.2/gcc_64"
+  before_script:
+    - apt update
+    # Build tools plus the runtime libraries the bundled Qt xcb platform plugin
+    # links against, so linuxdeployqt can copy them into the package. We install a
+    # prebuilt Qt6 with aqtinstall rather than compiling Qt statically from source,
+    # which makes this job several times faster than the previous static build.
+    - >-
+      DEBIAN_FRONTEND=noninteractive apt install -y
+      g++ cmake ninja-build python3-pip python3-venv wget zip file ca-certificates
+      libgl1-mesa-dev libglx-dev libopengl-dev libegl1-mesa-dev
+      libxkbcommon0 libxkbcommon-x11-0 libfontconfig1 libfreetype6
+      libdbus-1-3 libglib2.0-0 libcups2 libxcb1 libxcb-cursor0 libxcb-glx0 libxcb-icccm4
+      libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render0 libxcb-render-util0
+      libxcb-shape0 libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0
+      libxcb-xinerama0 libxcb-xkb1
+    - python3 -m venv /opt/aqt
+    - /opt/aqt/bin/pip install aqtinstall
+    - /opt/aqt/bin/aqt install-qt linux desktop $QT_VERSION $QT_ARCH --outputdir /opt/Qt
+  script:
+    - export PATH="$QT_DIR/bin:$PATH"
+    # Build and package netanim.
+    - cmake -B cmake-cache -G Ninja -DCMAKE_BUILD_TYPE=Release -DPACKAGING=ON -DCMAKE_PREFIX_PATH="$QT_DIR" -DCMAKE_INSTALL_PREFIX="$CI_PROJECT_DIR/tmp/netanim"
+    - cmake --build cmake-cache --parallel
+    - cmake --install cmake-cache
+    # Bundle the Qt libraries, plugins and non-Qt dependencies next to the binary.
+    - wget -q https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+    - chmod +x linuxdeployqt-continuous-x86_64.AppImage
+    - ./linuxdeployqt-continuous-x86_64.AppImage --appimage-extract
+    - ./squashfs-root/usr/bin/linuxdeployqt tmp/netanim/bin/netanim -bundle-non-qt-libs -always-overwrite -extra-plugins=iconengines,imageformats
+    - mkdir -p packages
+    - cd tmp/netanim && zip -r "$CI_PROJECT_DIR/packages/Netanim-Linux.zip" .
+  artifacts:
+    paths:
+      - packages/*.zip
+    when: on_success
+
+packaging-macos:
+  stage: packaging
+  # Hosted macOS runners require a Premium/Ultimate plan (or the GitLab for Open
+  # Source program); they are not available on the Free tier. Until this project
+  # has macOS runner access, run this job manually and never let its absence fail
+  # the pipeline. Remove `when: manual` / `allow_failure` once a runner is available.
+  when: manual
+  allow_failure: true
+  tags:
+    - saas-macos-medium-m1
+  image: macos-15-xcode-16
+  before_script:
+    - brew update
+    - brew install cmake qt
+  script:
+    - cmake -B cmake-cache -DCMAKE_BUILD_TYPE=Release -DPACKAGING=ON -DCMAKE_PREFIX_PATH=$(brew --prefix qt)
+    - cmake --build cmake-cache --parallel
+    - cd cmake-cache && cpack -G Bundle
+  artifacts:
+    paths:
+      - packages/*.dmg
+    when: on_success
+
+packaging-windows:
+  stage: packaging
+  tags:
+    - saas-windows-medium-amd64
+  variables:
+    QT_VERSION: "6.9.2"
+    QT_ARCH: "win64_msvc2022_64"
+    QT_OUTPUT_DIR: "C:\\Qt"
+    # Where aqt unpacks the toolkit (<output>\<version>\msvc2022_64).
+    QT_DIR: "C:\\Qt\\6.9.2\\msvc2022_64"
+    INSTALL_DIR: "$CI_PROJECT_DIR\\tmp\\netanim"
+  before_script:
+    # MSVC (Visual Studio 2022 Build Tools), CMake and Python are preinstalled
+    # on the Windows SaaS runner image, so we only need a Qt toolkit.
+    - python -m pip install aqtinstall
+    # Qt ships no official static builds and the only SaaS Windows runner has a
+    # mere 2 vCPUs, so building Qt statically from source (as the Linux job does)
+    # is not viable here. Instead we install a prebuilt Qt6 for MSVC and deploy
+    # the required DLLs alongside the executable with windeployqt. QtSvg ships in
+    # the base desktop package (it is not a separately selectable aqt module).
+    - python -m aqt install-qt windows desktop $env:QT_VERSION $env:QT_ARCH --outputdir $env:QT_OUTPUT_DIR
+  script:
+    # Build and package netanim (PACKAGING=ON yields a windowed GUI executable).
+    - cmake -B cmake-cache -G "Visual Studio 17 2022" -A x64 -DPACKAGING=ON -DCMAKE_PREFIX_PATH="$env:QT_DIR" -DCMAKE_INSTALL_PREFIX="$env:INSTALL_DIR"
+    - cmake --build cmake-cache --config Release --parallel
+    - cmake --install cmake-cache --config Release
+    # Collect the Qt runtime DLLs, the platform/imageformat/iconengine plugins
+    # and the MSVC runtime next to netanim.exe.
+    - '& "$env:QT_DIR\bin\windeployqt.exe" --release --compiler-runtime --no-translations "$env:INSTALL_DIR\bin\netanim.exe"'
+    # Stage everything under a single NetAnim/ folder and zip it.
+    - New-Item -ItemType Directory -Force packages | Out-Null
+    - New-Item -ItemType Directory -Force package-staging\NetAnim | Out-Null
+    - Copy-Item -Recurse -Force "$env:INSTALL_DIR\bin\*" package-staging\NetAnim
+    - Compress-Archive -Path package-staging\NetAnim -DestinationPath packages\Netanim-Windows.zip -Force
+  artifacts:
+    paths:
+      - packages/*.zip
+    when: on_success
