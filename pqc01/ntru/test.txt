@@ -1,0 +1,21 @@
+// src/poly.h 파일의 맨 마지막 부분 (이것만 있어야 함)
+extern uint8_t (*ntru_mult_tern)(NtruIntPoly *a, NtruTernPoly *b, NtruIntPoly *c, uint16_t mod_mask);
+extern void (*ntru_to_arr)(NtruIntPoly *p, uint16_t q, uint8_t *a);
+extern uint8_t (*ntru_mult_int)(NtruIntPoly *a, NtruIntPoly *b, NtruIntPoly *c, uint16_t mod_mask);
+extern void (*ntru_mod_mask)(NtruIntPoly *p, uint16_t mod_mask);
+extern uint8_t (*ntru_invert)(NtruPrivPoly *a, uint16_t mod_mask, NtruIntPoly *Fq);
+
+
+
+// src/poly.c 파일의 가장 맨 아래에 추가
+uint8_t (*ntru_mult_tern)(NtruIntPoly *a, NtruTernPoly *b, NtruIntPoly *c, uint16_t mod_mask) = NULL;
+void (*ntru_to_arr)(NtruIntPoly *p, uint16_t q, uint8_t *a) = NULL;
+uint8_t (*ntru_mult_int)(NtruIntPoly *a, NtruIntPoly *b, NtruIntPoly *c, uint16_t mod_mask) = NULL;
+void (*ntru_mod_mask)(NtruIntPoly *p, uint16_t mod_mask) = NULL;
+uint8_t (*ntru_invert)(NtruPrivPoly *a, uint16_t mod_mask, NtruIntPoly *Fq) = NULL;
+
+
+
+make clean
+make
+make test
