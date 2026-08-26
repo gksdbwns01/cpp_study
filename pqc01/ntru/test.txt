@@ -19,3 +19,19 @@ uint8_t (*ntru_invert)(NtruPrivPoly *a, uint16_t mod_mask, NtruIntPoly *Fq) = NU
 make clean
 make
 make test
+
+<실행>
+라이브러리가 잘 빌드되었는지 테스트
+cd ~/cpp_study/pqc01/ntru/libntru
+make test
+
+성능 측정(벤치마크) 테스트
+make bench
+./bench
+libntru.so 링커/로더 에러 발생시
+export LD_LIBRARY_PATH=.
+./bench
+
+main.c
+cc -Isrc -L. main.c -lntru -o my_ntru_test
+LD_LIBRARY_PATH=. ./my_ntru_test
