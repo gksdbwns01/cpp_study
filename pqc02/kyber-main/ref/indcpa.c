@@ -278,6 +278,16 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   uint8_t nonce = 0;
   polyvec sp, pkpv, ep, at[KYBER_K], b;
   poly v, k, epp;
+  // 추가: 플래그에 따라 문자열 포인터를 다르게 설정
+  const char* lbl_m_enc = is_reencap ? "Encode(m') = k'" : "Encode(m) = k";
+  const char* lbl_r     = is_reencap ? "r' (sp')" : "r (sp)";
+  const char* lbl_e1    = is_reencap ? "e1' (ep')" : "e1 (ep)";
+  const char* lbl_e2    = is_reencap ? "e2' (epp')" : "e2 (epp)";
+  const char* lbl_atr   = is_reencap ? "A^T * r'" : "A^T * r";
+  const char* lbl_u     = is_reencap ? "u' = A^T * r' + e1'" : "u = A^T * r + e1";
+  const char* lbl_ttr   = is_reencap ? "t^T * r'" : "t^T * r";
+  const char* lbl_ttre2 = is_reencap ? "t^T * r' + e2'" : "t^T * r + e2";
+  const char* lbl_v     = is_reencap ? "v' = t^T * r' + e2' + Encode(m')" : "v = t^T * r + e2 + Encode(m)";
   // 추가: 플래그에 따른 배너 분리 출력
   if(is_reencap) {
       printf("\n\n========================================");
@@ -293,8 +303,8 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 
   unpack_pk(&pkpv, seed, pk);
   poly_frommsg(&k, m);
-  // 추가: 메시지 인코딩 결과 출력
-  print_poly_short("Encode(m) = k", &k);
+  // 수정: 동적 라벨 사용
+  print_poly_short(lbl_m_enc, &k);
 
   gen_at(at, seed);
 
@@ -303,9 +313,10 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   for(i=0;i<KYBER_K;i++)
     poly_getnoise_eta2(ep.vec+i, coins, nonce++);
   poly_getnoise_eta2(&epp, coins, nonce++);
-  print_polyvec_debug("r (sp)", &sp);
-  print_polyvec_debug("e1 (ep)", &ep);
-  print_poly_short("e2 (epp)", &epp);
+  // 수정: 동적 라벨 사용
+  print_polyvec_debug(lbl_r, &sp);
+  print_polyvec_debug(lbl_e1, &ep);
+  print_poly_short(lbl_e2, &epp);
 
   polyvec_ntt(&sp);
 
@@ -317,20 +328,20 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
 
   polyvec_invntt_tomont(&b);
   // 추가: u의 중간 계산 단계
-  print_polyvec_debug("A^T * r", &b);
+  print_polyvec_debug(lbl_atr, &b);
   poly_invntt_tomont(&v);
-  print_poly_short("t^T * r", &v);
+  print_poly_short(lbl_ttr, &v);
   polyvec_add(&b, &b, &ep);
   // 추가: 최종 u 완성
-  print_polyvec_debug("u = A^T * r + e1", &b);
+  print_polyvec_debug(lbl_u, &b);
 
   poly_add(&v, &v, &epp);
   // 추가: e2 더함
-  print_poly_short("t^T * r + e2", &v);
+  print_poly_short(lbl_ttre2, &v);
 
   poly_add(&v, &v, &k);
   // 추가: 최종 v 완성
-  print_poly_short("v = t^T * r + e2 + Encode(m)", &v);
+  print_poly_short(lbl_v, &v);
 
   polyvec_reduce(&b);
   poly_reduce(&v);

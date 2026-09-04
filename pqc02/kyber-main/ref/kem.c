@@ -8,6 +8,7 @@
 #include "symmetric.h"
 #include "randombytes.h"
 extern int is_reencap;
+extern uint8_t global_m[KYBER_SYMBYTES];
 extern void print_hex_debug(const char *name, const uint8_t *data, size_t len);
 /*************************************************
 * Name:        crypto_kem_keypair_derand
@@ -85,7 +86,8 @@ int crypto_kem_enc_derand(uint8_t *ct,
   uint8_t kr[2*KYBER_SYMBYTES];
 
   memcpy(buf, coins, KYBER_SYMBYTES);
-
+  // 추가: 인코딩 전에 원본 메시지 m을 전역 변수에 저장
+  memcpy(global_m, buf, KYBER_SYMBYTES);
   /* Multitarget countermeasure for coins + contributory KEM */
   hash_h(buf+KYBER_SYMBYTES, pk, KYBER_PUBLICKEYBYTES);
   hash_g(kr, buf, 2*KYBER_SYMBYTES);
@@ -153,7 +155,12 @@ int crypto_kem_dec(uint8_t *ss,
 
   indcpa_dec(buf, ct, sk);
   print_hex_debug("Decapsulation: m' (buf)", buf, KYBER_SYMBYTES);
-
+  // 추가: m == m' 검증 출력
+  if (memcmp(global_m, buf, KYBER_SYMBYTES) == 0) {
+      printf("\n[CHECK] m == m' : YES\n");
+  } else {
+      printf("\n[CHECK] m == m' : NO\n");
+  }
   /* Multitarget countermeasure for coins + contributory KEM */
   memcpy(buf+KYBER_SYMBYTES, sk+KYBER_SECRETKEYBYTES-2*KYBER_SYMBYTES, KYBER_SYMBYTES);
   hash_g(kr, buf, 2*KYBER_SYMBYTES);
@@ -176,13 +183,12 @@ int crypto_kem_dec(uint8_t *ss,
   /* Compute rejection key */
   rkprf(ss,sk+KYBER_SECRETKEYBYTES-KYBER_SYMBYTES,ct);
   // 수정: Fallback Key -> Fallback secret z 로 의미 명확화
-  print_hex_debug("Fallback secret z (검증 실패 시 도출되는 안전 장치)", ss, KYBER_SYMBYTES);
-  print_hex_debug("True Key (정상 복원된 공유 키, kr)", kr, KYBER_SYMBYTES);
+  print_hex_debug("Fallback secret z", ss, KYBER_SYMBYTES);
+  print_hex_debug("kr (KDF 입력용 중간 secret)", kr, KYBER_SYMBYTES);
 
   /* Copy true key to return buffer if fail is false */
   cmov(ss,kr,KYBER_SYMBYTES,!fail);
-  // 수정: 최종 도출 키
-  print_hex_debug("Final Shared Secret (최종 도출된 ss, KDF 적용 전 단계)", ss, KYBER_SYMBYTES);
-  
+  // 수정: 최종 도출된 ss 명칭 변경
+  print_hex_debug("Final Shared Secret ss", ss, KYBER_SYMBYTES);
   return 0;
 }

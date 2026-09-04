@@ -6,6 +6,7 @@
 #include "poly.h"
 #include "polyvec.h"
 int is_reencap = 0;
+uint8_t global_m[KYBER_SYMBYTES];
 /* ================================
  * 출력 헬퍼 함수 정의 (헤더 파일 없이 이곳에 배치)
  * ================================ */
