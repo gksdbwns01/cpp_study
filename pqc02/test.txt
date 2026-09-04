@@ -3,3 +3,7 @@
 
 ref 폴더의 my_test.c 파일
 gksdbwns@DESKTOP-PDHFAPH:~/cpp_study/pqc02/kyber-main/ref$ ./my_test
+
+-O3: 레벨 3(최고 수준) 코드 최적화 옵션입니다. 컴파일 시간은 조금 길어질 수 있지만, 암호 연산 프로그램의 실행 속도를 극대화합니다.
+-DKYBER_K=2: 소스 코드 내의 전처리 매크로 KYBER_K의 값을 2로 정의합니다. 카이버에서 이 파라미터 k가 2이면 Kyber-512 보안 강도로 작동하게 됩니다. (k=3은 Kyber-768, k=4는 Kyber-1024입니다.)
+kem.c indcpa.c ... randombytes.c: 카이버 알고리즘 동작에 필수적인 공식 레퍼런스 C 파일들입니다. 암호화/복호화 코어(indcpa), 다항식 연산(poly), 정수론적 변환(ntt), 해시 알고리즘(fips202), 난수 생성(randombytes) 기능이 나뉘어 있습니다.
