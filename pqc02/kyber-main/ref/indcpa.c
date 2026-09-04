@@ -12,6 +12,7 @@ extern void print_hex_debug(const char *name, const uint8_t *data, size_t len);
 extern void print_poly_short(const char *name, const poly *p);
 extern void print_polyvec_debug(const char *name, const polyvec *v);
 extern void print_matrix_debug(const char *name, polyvec a[KYBER_K]);
+extern int is_reencap;
 /*************************************************
 * Name:        pack_pk
 *
@@ -239,7 +240,8 @@ void indcpa_keypair_derand(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
     polyvec_basemul_acc_montgomery(&pkpv.vec[i], &a[i], &skpv);
     poly_tomont(&pkpv.vec[i]);
   }
-  print_polyvec_debug("A * s", &pkpv);
+  // 수정: 정수 행렬곱이 아님을 명시
+  print_polyvec_debug("A * s (NTT 및 Montgomery 모듈러 연산 적용)", &pkpv);
 
   polyvec_add(&pkpv, &pkpv, &e);
   print_polyvec_debug("t = A*s + e", &pkpv);
@@ -276,9 +278,24 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   uint8_t nonce = 0;
   polyvec sp, pkpv, ep, at[KYBER_K], b;
   poly v, k, epp;
+  // 추가: 플래그에 따른 배너 분리 출력
+  if(is_reencap) {
+      printf("\n\n========================================");
+      printf("\n         RE-ENCAPSULATION (ct')         ");
+      printf("\n========================================\n");
+  } else {
+      printf("\n\n========================================");
+      printf("\n         ORIGINAL ENCAPSULATION         ");
+      printf("\n========================================\n");
+      // ★ 추가: 원본 메시지 m 출력 (재암호화가 아닐 때만)
+      print_hex_debug("Original Message (m)", m, KYBER_INDCPA_MSGBYTES);
+  }
 
   unpack_pk(&pkpv, seed, pk);
   poly_frommsg(&k, m);
+  // 추가: 메시지 인코딩 결과 출력
+  print_poly_short("Encode(m) = k", &k);
+
   gen_at(at, seed);
 
   for(i=0;i<KYBER_K;i++)
@@ -299,13 +316,20 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   polyvec_basemul_acc_montgomery(&v, &pkpv, &sp);
 
   polyvec_invntt_tomont(&b);
+  // 추가: u의 중간 계산 단계
+  print_polyvec_debug("A^T * r", &b);
   poly_invntt_tomont(&v);
-
+  print_poly_short("t^T * r", &v);
   polyvec_add(&b, &b, &ep);
+  // 추가: 최종 u 완성
   print_polyvec_debug("u = A^T * r + e1", &b);
 
   poly_add(&v, &v, &epp);
+  // 추가: e2 더함
+  print_poly_short("t^T * r + e2", &v);
+
   poly_add(&v, &v, &k);
+  // 추가: 최종 v 완성
   print_poly_short("v = t^T * r + e2 + Encode(m)", &v);
 
   polyvec_reduce(&b);
@@ -339,13 +363,16 @@ void indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
 
   polyvec_ntt(&b);
   polyvec_basemul_acc_montgomery(&mp, &skpv, &b);
+  // 추가: NTT 도메인 상의 연산임을 명시
+  print_poly_short("NTT-domain (s^T * u)", &mp);
   poly_invntt_tomont(&mp);
-  print_poly_short("s^T * u", &mp);
-
+  // 추가: INTT(역변환) 직후의 결과
+  print_poly_short("INTT(s^T * u)", &mp);
   poly_sub(&mp, &v, &mp);
   print_poly_short("v - s^T * u", &mp);
   poly_reduce(&mp);
 
   poly_tomsg(m, &mp);
-  print_hex_debug("m' = Decode(v - s^T * u)", m, KYBER_INDCPA_MSGBYTES);
+  // ★ 수정: 최종 복원 메시지 명확화
+  print_hex_debug("Decoded Message m' = Decode(v - s^T * u)", m, KYBER_INDCPA_MSGBYTES);
 }

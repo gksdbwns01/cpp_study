@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "params.h"
 #include "kem.h"
 #include "poly.h"
 #include "polyvec.h"
-
+int is_reencap = 0;
 /* ================================
  * 출력 헬퍼 함수 정의 (헤더 파일 없이 이곳에 배치)
  * ================================ */
@@ -77,8 +78,11 @@ int main(void) {
     print_hex_debug("Alice Shared Secret (ss_a)", ss_a, CRYPTO_BYTES);
     print_hex_debug("Bob Shared Secret (ss_b)", ss_b, CRYPTO_BYTES);
     
-    if(ss_a[0] == ss_b[0]) {
-        printf("\n=> SUCCESS: Shared secrets match!\n");
+    // 전체 32바이트(CRYPTO_BYTES)를 완벽하게 비교
+    if(memcmp(ss_a, ss_b, CRYPTO_BYTES) == 0) {
+        printf("\n=> SUCCESS: Shared secrets match completely!\n");
+    } else {
+        printf("\n=> FAIL: Shared secrets do not match!\n");
     }
     return 0;
 }

@@ -7,6 +7,7 @@
 #include "verify.h"
 #include "symmetric.h"
 #include "randombytes.h"
+extern int is_reencap;
 extern void print_hex_debug(const char *name, const uint8_t *data, size_t len);
 /*************************************************
 * Name:        crypto_kem_keypair_derand
@@ -158,7 +159,10 @@ int crypto_kem_dec(uint8_t *ss,
   hash_g(kr, buf, 2*KYBER_SYMBYTES);
 
   /* coins are in kr+KYBER_SYMBYTES */
+  is_reencap = 1; // 추가: 여기서부터는 재암호화 과정임을 알림
   indcpa_enc(cmp, buf, pk, kr+KYBER_SYMBYTES);
+  is_reencap = 0; // 추가: 재암호화가 끝났으므로 원상 복구
+
   print_hex_debug("Re-encapsulated: ct' (cmp)", cmp, 32); // 앞 32바이트만 비교 확인
   print_hex_debug("Original: ct", ct, 32);
 
@@ -171,12 +175,14 @@ int crypto_kem_dec(uint8_t *ss,
 
   /* Compute rejection key */
   rkprf(ss,sk+KYBER_SECRETKEYBYTES-KYBER_SYMBYTES,ct);
-  print_hex_debug("Fallback Key (검증 실패 시 사용될 거부 키)", ss, KYBER_SYMBYTES);
-  print_hex_debug("True Key (정상적으로 복원된 공유 키, kr)", kr, KYBER_SYMBYTES);
+  // 수정: Fallback Key -> Fallback secret z 로 의미 명확화
+  print_hex_debug("Fallback secret z (검증 실패 시 도출되는 안전 장치)", ss, KYBER_SYMBYTES);
+  print_hex_debug("True Key (정상 복원된 공유 키, kr)", kr, KYBER_SYMBYTES);
 
   /* Copy true key to return buffer if fail is false */
   cmov(ss,kr,KYBER_SYMBYTES,!fail);
-  print_hex_debug("Final Decapsulated Key (최종 도출된 ss)", ss, KYBER_SYMBYTES);
+  // 수정: 최종 도출 키
+  print_hex_debug("Final Shared Secret (최종 도출된 ss, KDF 적용 전 단계)", ss, KYBER_SYMBYTES);
   
   return 0;
 }
