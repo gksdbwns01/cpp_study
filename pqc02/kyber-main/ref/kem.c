@@ -7,6 +7,7 @@
 #include "verify.h"
 #include "symmetric.h"
 #include "randombytes.h"
+extern void print_hex_debug(const char *name, const uint8_t *data, size_t len);
 /*************************************************
 * Name:        crypto_kem_keypair_derand
 *
@@ -150,6 +151,7 @@ int crypto_kem_dec(uint8_t *ss,
   const uint8_t *pk = sk+KYBER_INDCPA_SECRETKEYBYTES;
 
   indcpa_dec(buf, ct, sk);
+  print_hex_debug("Decapsulation: m' (buf)", buf, KYBER_SYMBYTES);
 
   /* Multitarget countermeasure for coins + contributory KEM */
   memcpy(buf+KYBER_SYMBYTES, sk+KYBER_SECRETKEYBYTES-2*KYBER_SYMBYTES, KYBER_SYMBYTES);
@@ -157,14 +159,24 @@ int crypto_kem_dec(uint8_t *ss,
 
   /* coins are in kr+KYBER_SYMBYTES */
   indcpa_enc(cmp, buf, pk, kr+KYBER_SYMBYTES);
+  print_hex_debug("Re-encapsulated: ct' (cmp)", cmp, 32); // 앞 32바이트만 비교 확인
+  print_hex_debug("Original: ct", ct, 32);
 
   fail = verify(ct, cmp, KYBER_CIPHERTEXTBYTES);
+  if(fail == 0) {
+      printf("\n[CHECK] ct == ct' : YES (Success)\n");
+  } else {
+      printf("\n[CHECK] ct == ct' : NO (Fallback to random key)\n");
+  }
 
   /* Compute rejection key */
   rkprf(ss,sk+KYBER_SECRETKEYBYTES-KYBER_SYMBYTES,ct);
+  print_hex_debug("Fallback Key (검증 실패 시 사용될 거부 키)", ss, KYBER_SYMBYTES);
+  print_hex_debug("True Key (정상적으로 복원된 공유 키, kr)", kr, KYBER_SYMBYTES);
 
   /* Copy true key to return buffer if fail is false */
   cmov(ss,kr,KYBER_SYMBYTES,!fail);
-
+  print_hex_debug("Final Decapsulated Key (최종 도출된 ss)", ss, KYBER_SYMBYTES);
+  
   return 0;
 }

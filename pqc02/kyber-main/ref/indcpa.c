@@ -8,7 +8,10 @@
 #include "ntt.h"
 #include "symmetric.h"
 #include "randombytes.h"
-
+extern void print_hex_debug(const char *name, const uint8_t *data, size_t len);
+extern void print_poly_short(const char *name, const poly *p);
+extern void print_polyvec_debug(const char *name, const polyvec *v);
+extern void print_matrix_debug(const char *name, polyvec a[KYBER_K]);
 /*************************************************
 * Name:        pack_pk
 *
@@ -218,11 +221,15 @@ void indcpa_keypair_derand(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
   hash_g(buf, buf, KYBER_SYMBYTES+1);
 
   gen_a(a, publicseed);
+  print_matrix_debug("A", a); // A 행렬 출력
 
   for(i=0;i<KYBER_K;i++)
     poly_getnoise_eta1(&skpv.vec[i], noiseseed, nonce++);
+  print_polyvec_debug("s (skpv)", &skpv); // s 출력
+
   for(i=0;i<KYBER_K;i++)
     poly_getnoise_eta1(&e.vec[i], noiseseed, nonce++);
+  print_polyvec_debug("e", &e); // e 출력
 
   polyvec_ntt(&skpv);
   polyvec_ntt(&e);
@@ -232,8 +239,10 @@ void indcpa_keypair_derand(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
     polyvec_basemul_acc_montgomery(&pkpv.vec[i], &a[i], &skpv);
     poly_tomont(&pkpv.vec[i]);
   }
+  print_polyvec_debug("A * s", &pkpv);
 
   polyvec_add(&pkpv, &pkpv, &e);
+  print_polyvec_debug("t = A*s + e", &pkpv);
   polyvec_reduce(&pkpv);
 
   pack_sk(sk, &skpv);
@@ -277,6 +286,9 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   for(i=0;i<KYBER_K;i++)
     poly_getnoise_eta2(ep.vec+i, coins, nonce++);
   poly_getnoise_eta2(&epp, coins, nonce++);
+  print_polyvec_debug("r (sp)", &sp);
+  print_polyvec_debug("e1 (ep)", &ep);
+  print_poly_short("e2 (epp)", &epp);
 
   polyvec_ntt(&sp);
 
@@ -290,8 +302,12 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   poly_invntt_tomont(&v);
 
   polyvec_add(&b, &b, &ep);
+  print_polyvec_debug("u = A^T * r + e1", &b);
+
   poly_add(&v, &v, &epp);
   poly_add(&v, &v, &k);
+  print_poly_short("v = t^T * r + e2 + Encode(m)", &v);
+
   polyvec_reduce(&b);
   poly_reduce(&v);
 
@@ -324,9 +340,12 @@ void indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
   polyvec_ntt(&b);
   polyvec_basemul_acc_montgomery(&mp, &skpv, &b);
   poly_invntt_tomont(&mp);
+  print_poly_short("s^T * u", &mp);
 
   poly_sub(&mp, &v, &mp);
+  print_poly_short("v - s^T * u", &mp);
   poly_reduce(&mp);
 
   poly_tomsg(m, &mp);
+  print_hex_debug("m' = Decode(v - s^T * u)", m, KYBER_INDCPA_MSGBYTES);
 }
