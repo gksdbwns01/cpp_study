@@ -183,12 +183,12 @@ int crypto_kem_dec(uint8_t *ss,
   /* Compute rejection key */
   rkprf(ss,sk+KYBER_SECRETKEYBYTES-KYBER_SYMBYTES,ct);
   // 수정: Fallback Key -> Fallback secret z 로 의미 명확화
-  print_hex_debug("Fallback secret z", ss, KYBER_SYMBYTES);
-  print_hex_debug("kr (정상 복원된 예비 세션키, 최신 ML-KEM 규격에 따라 바로 ss로 사용됨)", kr, KYBER_SYMBYTES);
+  print_hex_debug("Fallback secret z (검증 실패 시 사용하는 대체 비밀값)", ss, KYBER_SYMBYTES);
+  print_hex_debug("kr (정상 경로에서 생성된 키 재료)", kr, KYBER_SYMBYTES);
 
   /* Copy true key to return buffer if fail is false */
   cmov(ss,kr,KYBER_SYMBYTES,!fail);
   // 수정: 최종 도출된 ss 명칭 변경
-  print_hex_debug("Final Shared Secret ss (검증 결과에 따라 kr 또는 z가 선택됨)", ss, KYBER_SYMBYTES);
+  print_hex_debug("Final Shared Secret ss (최종 공유 비밀값)", ss, KYBER_SYMBYTES);
   return 0;
 }
