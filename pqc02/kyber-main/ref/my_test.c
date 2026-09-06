@@ -67,10 +67,14 @@ int main(void) {
     printf("\n            2. ENCAPSULATION            ");
     printf("\n========================================\n");
     crypto_kem_enc(ct, ss_b, pk);
+    // Alice가 캡슐화를 마치고 만들어낸 최종 암호문 출력
+    print_hex_debug("Ciphertext ct (Alice가 생성하여 Bob에게 전송)", ct, KYBER_CIPHERTEXTBYTES);
 
     printf("\n========================================");
     printf("\n            3. DECAPSULATION            ");
     printf("\n========================================\n");
+    // Bob이 탈캡슐화를 시작할 때 수신한 암호문 명시
+    print_hex_debug("Received Ciphertext ct (Bob이 수신한 암호문)", ct, KYBER_CIPHERTEXTBYTES);
     crypto_kem_dec(ss_a, ct, sk);
 
     printf("\n========================================");
