@@ -2,8 +2,31 @@
 ~/cpp_study/pqc02/kyber-main/ref$ ./test/test_kyber512
 
 ref 폴더의 my_test.c 파일
+cc -O3 -DKYBER_K=2 kem.c indcpa.c polyvec.c poly.c ntt.c cbd.c reduce.c verify.c fips202.c symmetric-shake.c randombytes.c my_test.c -o my_test
 gksdbwns@DESKTOP-PDHFAPH:~/cpp_study/pqc02/kyber-main/ref$ ./my_test
 
 -O3: 레벨 3(최고 수준) 코드 최적화 옵션입니다. 컴파일 시간은 조금 길어질 수 있지만, 암호 연산 프로그램의 실행 속도를 극대화합니다.
 -DKYBER_K=2: 소스 코드 내의 전처리 매크로 KYBER_K의 값을 2로 정의합니다. 카이버에서 이 파라미터 k가 2이면 Kyber-512 보안 강도로 작동하게 됩니다. (k=3은 Kyber-768, k=4는 Kyber-1024입니다.)
 kem.c indcpa.c ... randombytes.c: 카이버 알고리즘 동작에 필수적인 공식 레퍼런스 C 파일들입니다. 암호화/복호화 코어(indcpa), 다항식 연산(poly), 정수론적 변환(ntt), 해시 알고리즘(fips202), 난수 생성(randombytes) 기능이 나뉘어 있습니다.
+
+| 구분             | 이론 변수         | 코드 변수      | 설명           |
+| -------------- | ------------- | ---------- | ------------ |
+| KeyGen         | \(A\)         | `a`        | 공개 행렬        |
+| KeyGen         | \(s\)         | `skpv`     | 비밀 벡터        |
+| KeyGen         | \(e\)         | `e`        | KeyGen 오류 벡터 |
+| KeyGen         | \(t\)         | `pkpv`     | 공개키 벡터       |
+| Encaps         | \(A^T\)       | `at`       | 전치 행렬        |
+| Encaps         | \(r\)         | `sp`       | 임시 랜덤 벡터     |
+| Encaps         | \(e_1\)       | `ep`       | 암호화 오류 벡터    |
+| Encaps         | \(e_2\)       | `epp`      | 암호화 오류 다항식   |
+| Encaps         | \(m\)         | `m`        | 메시지          |
+| Encaps         | Encode(\(m\)) | `k`        | 인코딩된 메시지     |
+| Encaps         | \(u\)         | `b`        | 암호문 첫 번째 성분  |
+| Encaps         | \(v\)         | `v`        | 암호문 두 번째 성분  |
+| Decaps         | \(s^Tu\)      | `mp` 계산 과정 | 복호화 중간값      |
+| Decaps         | \(v-s^Tu\)    | `mp`       | 메시지 복구용 다항식  |
+| Decaps         | \(m'\)        | `m`        | 복구된 메시지      |
+| CCA            | \(ct'\)       | 재암호화 결과    | 재생성 암호문      |
+| CCA            | \(z\)         | `z`        | fallback 비밀값 |
+| Key derivation | `kr`          | `kr`       | 정상 경로의 키 재료  |
+| Final          | \(ss\)        | `ss`       | 최종 공유 비밀값    |
