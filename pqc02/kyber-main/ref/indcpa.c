@@ -279,23 +279,23 @@ void indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES],
   polyvec sp, pkpv, ep, at[KYBER_K], b;
   poly v, k, epp;
   // 추가: 플래그에 따라 문자열 포인터를 다르게 설정
-  const char* lbl_m_enc = is_reencap ? "Encode(m') = k'" : "Encode(m) = k";
-  const char* lbl_r     = is_reencap ? "r' (sp')" : "r (sp)";
-  const char* lbl_e1    = is_reencap ? "e1' (ep')" : "e1 (ep)";
-  const char* lbl_e2    = is_reencap ? "e2' (epp')" : "e2 (epp)";
-  const char* lbl_atr   = is_reencap ? "A^T * r'" : "A^T * r";
-  const char* lbl_u     = is_reencap ? "u' = A^T * r' + e1'" : "u = A^T * r + e1";
-  const char* lbl_ttr   = is_reencap ? "t^T * r'" : "t^T * r";
-  const char* lbl_ttre2 = is_reencap ? "t^T * r' + e2'" : "t^T * r + e2";
-  const char* lbl_v     = is_reencap ? "v' = t^T * r' + e2' + Encode(m')" : "v = t^T * r + e2 + Encode(m)";
+const char* lbl_m_enc = is_reencap ? "인코딩(m') = k'" : "인코딩(m) = k";
+const char* lbl_r     = is_reencap ? "무작위 벡터 r' (sp')" : "무작위 벡터 r (sp)";
+const char* lbl_e1    = is_reencap ? "오차 벡터 e1' (ep')" : "오차 벡터 e1 (ep)";
+const char* lbl_e2    = is_reencap ? "오차 다항식 e2' (epp')" : "오차 다항식 e2 (epp)";
+const char* lbl_atr   = is_reencap ? "A^T * r'" : "A^T * r";
+const char* lbl_u     = is_reencap ? "u' = A^T * r' + e1'" : "u = A^T * r + e1";
+const char* lbl_ttr   = is_reencap ? "t^T * r'" : "t^T * r";
+const char* lbl_ttre2 = is_reencap ? "t^T * r' + e2'" : "t^T * r + e2";
+const char* lbl_v     = is_reencap ? "v' = t^T * r' + e2' + 인코딩(m')" : "v = t^T * r + e2 + 인코딩(m)";
   // 추가: 플래그에 따른 배너 분리 출력
   if(is_reencap) {
       printf("\n\n========================================");
-      printf("\n         RE-ENCAPSULATION (ct')         ");
+      printf("\n         RE-Encaps  (ct')         ");
       printf("\n========================================\n");
   } else {
       printf("\n\n========================================");
-      printf("\n         ORIGINAL ENCAPSULATION         ");
+      printf("\n         원본 암호화 과정 (Encaps)         ");
       printf("\n========================================\n");
       // ★ 추가: 원본 메시지 m 출력 (재암호화가 아닐 때만)
       print_hex_debug("Original Message (m)", m, KYBER_INDCPA_MSGBYTES);
@@ -375,15 +375,15 @@ void indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES],
   polyvec_ntt(&b);
   polyvec_basemul_acc_montgomery(&mp, &skpv, &b);
   // 추가: NTT 도메인 상의 연산임을 명시
-  print_poly_short("NTT-domain (s^T * u)", &mp);
+  print_poly_short("NTT 영역 연산 (s^T * u)", &mp);
   poly_invntt_tomont(&mp);
   // 추가: INTT(역변환) 직후의 결과
-  print_poly_short("INTT(s^T * u)", &mp);
+  print_poly_short("역NTT 변환 직후 (s^T * u)", &mp);
   poly_sub(&mp, &v, &mp);
   print_poly_short("v - s^T * u", &mp);
   poly_reduce(&mp);
 
   poly_tomsg(m, &mp);
-  // ★ 수정: 최종 복원 메시지 명확화
-  print_hex_debug("Decoded Message m' = Decode(v - s^T * u)", m, KYBER_INDCPA_MSGBYTES);
+  // 수정: 최종 복원 메시지 명확화
+  print_hex_debug("복원된 메시지 m' = 디코딩(v - s^T * u)", m, KYBER_INDCPA_MSGBYTES);
 }

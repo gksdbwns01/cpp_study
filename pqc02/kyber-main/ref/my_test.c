@@ -59,35 +59,35 @@ int main(void) {
     uint8_t ss_b[CRYPTO_BYTES];
 
     printf("\n========================================");
-    printf("\n            1. KEY GENERATION           ");
+    printf("\n            1. 키 생성 (KEY GENERATION)          ");
     printf("\n========================================\n");
     crypto_kem_keypair(pk, sk);
 
     printf("\n========================================");
-    printf("\n            2. ENCAPSULATION            ");
+    printf("\n            2. Encaps            ");
     printf("\n========================================\n");
     crypto_kem_enc(ct, ss_b, pk);
     // Alice가 캡슐화를 마치고 만들어낸 최종 암호문 출력
     print_hex_debug("Ciphertext ct (Alice가 생성하여 Bob에게 전송)", ct, KYBER_CIPHERTEXTBYTES);
 
     printf("\n========================================");
-    printf("\n            3. DECAPSULATION            ");
+    printf("\n            3. Decaps            ");
     printf("\n========================================\n");
     // Bob이 탈캡슐화를 시작할 때 수신한 암호문 명시
     print_hex_debug("Received Ciphertext ct (Bob이 수신한 암호문)", ct, KYBER_CIPHERTEXTBYTES);
     crypto_kem_dec(ss_a, ct, sk);
 
     printf("\n========================================");
-    printf("\n            FINAL RESULT                ");
+    printf("\n            최종 결과                ");
     printf("\n========================================\n");
-    print_hex_debug("Alice Shared Secret (ss_a)", ss_a, CRYPTO_BYTES);
-    print_hex_debug("Bob Shared Secret (ss_b)", ss_b, CRYPTO_BYTES);
-    
+    print_hex_debug("Alice의 공유 비밀키 (ss_a)", ss_a, CRYPTO_BYTES);
+    print_hex_debug("Bob의 공유 비밀키 (ss_b)", ss_b, CRYPTO_BYTES);
+
     // 전체 32바이트(CRYPTO_BYTES)를 완벽하게 비교
     if(memcmp(ss_a, ss_b, CRYPTO_BYTES) == 0) {
-        printf("\n=> SUCCESS: Shared secrets match completely!\n");
+        printf("\n=> 성공: 공유 비밀키가 일치\n");
     } else {
-        printf("\n=> FAIL: Shared secrets do not match!\n");
+        printf("\n=> 실패: 공유 비밀키가 일치하지 않음\n");
     }
     return 0;
 }

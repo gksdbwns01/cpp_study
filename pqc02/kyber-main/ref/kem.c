@@ -157,9 +157,9 @@ int crypto_kem_dec(uint8_t *ss,
   print_hex_debug("Decapsulation: m' (buf)", buf, KYBER_SYMBYTES);
   // 추가: m == m' 검증 출력
   if (memcmp(global_m, buf, KYBER_SYMBYTES) == 0) {
-      printf("\n[CHECK] m == m' : YES\n");
+      printf("\n[CHECK] m == m' : 일치\n");
   } else {
-      printf("\n[CHECK] m == m' : NO\n");
+      printf("\n[CHECK] m == m' : 불일치\n");
   }
   /* Multitarget countermeasure for coins + contributory KEM */
   memcpy(buf+KYBER_SYMBYTES, sk+KYBER_SECRETKEYBYTES-2*KYBER_SYMBYTES, KYBER_SYMBYTES);
@@ -170,14 +170,14 @@ int crypto_kem_dec(uint8_t *ss,
   indcpa_enc(cmp, buf, pk, kr+KYBER_SYMBYTES);
   is_reencap = 0; // 추가: 재암호화가 끝났으므로 원상 복구
 
-  print_hex_debug("Re-encapsulated: ct' (cmp)", cmp, 32); // 앞 32바이트만 비교 확인
-  print_hex_debug("Original: ct", ct, 32);
+  print_hex_debug("재암호화된 암호문: ct' (cmp)", cmp, 32); // 앞 32바이트만 비교 확인
+  print_hex_debug("수신된 원본 암호문: ct", ct, 32);
 
   fail = verify(ct, cmp, KYBER_CIPHERTEXTBYTES);
   if(fail == 0) {
-      printf("\n[CHECK] ct == ct' : YES (Success)\n");
+      printf("\n[CHECK] ct == ct' : 성공\n");
   } else {
-      printf("\n[CHECK] ct == ct' : NO (Fallback to random key)\n");
+      printf("\n[CHECK] ct == ct' : 실패 - 임의 키로 대체\n");
   }
 
   /* Compute rejection key */
@@ -190,9 +190,9 @@ int crypto_kem_dec(uint8_t *ss,
   cmov(ss,kr,KYBER_SYMBYTES,!fail);
   // 수정: 최종 도출된 ss 명칭 변경
   if (fail == 0) {
-      print_hex_debug("Final Shared Secret ss ( = kr, 정상 경로 키 재료 선택됨 )", ss, KYBER_SYMBYTES);
+      print_hex_debug("최종 공유 비밀키 ss ( = kr, 정상 경로 키 재료 선택됨 )", ss, KYBER_SYMBYTES);
   } else {
-      print_hex_debug("Final Shared Secret ss ( = Fallback secret z, 대체 비밀값 선택됨 )", ss, KYBER_SYMBYTES);
+      print_hex_debug("최종 공유 비밀키 ss ( = Fallback secret z, 대체 비밀값 선택됨 )", ss, KYBER_SYMBYTES);
   }
   return 0;
 }

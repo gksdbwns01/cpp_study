@@ -2,6 +2,7 @@
 ~/cpp_study/pqc02/kyber-main/ref$ ./test/test_kyber512
 
 ref 폴더의 my_test.c 파일
+cd ~/cpp_study/pqc02/kyber-main/ref
 cc -O3 -DKYBER_K=2 kem.c indcpa.c polyvec.c poly.c ntt.c cbd.c reduce.c verify.c fips202.c symmetric-shake.c randombytes.c my_test.c -o my_test
 gksdbwns@DESKTOP-PDHFAPH:~/cpp_study/pqc02/kyber-main/ref$ ./my_test
 
