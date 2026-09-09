@@ -31,3 +31,7 @@ kem.c indcpa.c ... randombytes.c: 카이버 알고리즘 동작에 필수적인 
 | CCA            | \(z\)         | `z`        | fallback 비밀값 |
 | Key derivation | `kr`          | `kr`       | 정상 경로의 키 재료  |
 | Final          | \(ss\)        | `ss`       | 최종 공유 비밀값    |
+
+오류 시나리오
+네트워크 전송 중 의도적 오류 주입: 암호문 첫 바이트 변조
+ct[0] ^= 0xFF; // 첫 바이트의 비트를 반전시켜 의도적으로 훼손

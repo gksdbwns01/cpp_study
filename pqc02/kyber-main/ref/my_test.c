@@ -70,6 +70,13 @@ int main(void) {
     // Alice가 캡슐화를 마치고 만들어낸 최종 암호문 출력
     print_hex_debug("Ciphertext ct (Alice가 생성하여 Bob에게 전송)", ct, KYBER_CIPHERTEXTBYTES);
 
+    // ==========================================
+    // [심화 시나리오] 의도적 오류 주입 추가
+    // ==========================================
+    printf("\n네트워크 전송 중 의도적 오류 주입: 암호문 첫 바이트 변조\n");
+    ct[0] ^= 0xFF; // 첫 바이트의 비트를 반전시켜 의도적으로 훼손
+    // ==========================================
+
     printf("\n========================================");
     printf("\n            3. Decaps            ");
     printf("\n========================================\n");
@@ -80,8 +87,8 @@ int main(void) {
     printf("\n========================================");
     printf("\n            최종 결과                ");
     printf("\n========================================\n");
-    print_hex_debug("Alice의 공유 비밀키 (ss_a)", ss_a, CRYPTO_BYTES);
-    print_hex_debug("Bob의 공유 비밀키 (ss_b)", ss_b, CRYPTO_BYTES);
+    print_hex_debug("Alice의 공유 비밀키 (ss_b)", ss_b, CRYPTO_BYTES);
+    print_hex_debug("Bob의 공유 비밀키 (ss_a)", ss_a, CRYPTO_BYTES);
 
     // 전체 32바이트(CRYPTO_BYTES)를 완벽하게 비교
     if(memcmp(ss_a, ss_b, CRYPTO_BYTES) == 0) {
