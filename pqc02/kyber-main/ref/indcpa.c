@@ -241,7 +241,7 @@ void indcpa_keypair_derand(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
     poly_tomont(&pkpv.vec[i]);
   }
   // 수정: 정수 행렬곱이 아님을 명시
-  print_polyvec_debug("A * s (NTT 및 Montgomery 모듈러 연산 적용)", &pkpv);
+  print_polyvec_debug("A * s", &pkpv);
 
   polyvec_add(&pkpv, &pkpv, &e);
   print_polyvec_debug("t = A*s + e", &pkpv);
