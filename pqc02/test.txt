@@ -1,4 +1,4 @@
-테스트
+카이버 테스트
 ~/cpp_study/pqc02/kyber-main/ref$ ./test/test_kyber512
 
 ref 폴더의 my_test.c 파일
