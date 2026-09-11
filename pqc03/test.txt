@@ -1,2 +1,6 @@
 ringlwe. Peikert
 cd pqc03/ringlwe-master
+
+rlwe_main.c 실행
+gcc -O3 -std=gnu99 -fcommon -DRLWE_RANDOMNESS_USE_OPENSSL_AES -DNHRECONCILE -DBINOMIAL -DM512 -DQ12289 rlwe_main.c rlwe_kex.c rlwe_params_512_12289.c FFT_512_12289.d/FFT_512_12289.c -o rlwe_512_12289_binomial -lm
+./rlwe_512_12289_binomial
