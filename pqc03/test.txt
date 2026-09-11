@@ -4,3 +4,8 @@ cd pqc03/ringlwe-master
 rlwe_main.c 실행
 gcc -O3 -std=gnu99 -fcommon -DRLWE_RANDOMNESS_USE_OPENSSL_AES -DBINOMIAL -DM512 -DQ12289 rlwe_main.c rlwe_kex.c rlwe_params_512_12289.c FFT_512_12289.d/FFT_512_12289.c -o rlwe_512_12289_peikert -lm
 ./rlwe_512_12289_peikert
+
+모듈러스(Modulus) $q$ 값은 12289입니다. 
+현재 컴파일할 때 넣으신 -DQ12289 옵션이 바로 이를 뜻하며, 
+다항식의 차수(배열의 길이)인 $n$은 -DM512 옵션에 따라 512로 설정되어 있습니다. 
+즉, 모든 다항식은 512개의 계수를 가지며, 각 계수는 0부터 12288 사이의 값을 가집니다.

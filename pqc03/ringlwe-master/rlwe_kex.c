@@ -602,7 +602,17 @@ void KEM1_Generate(RINGELT s[2*m], RINGELT b[m]) {
         /*Take Alice's public key out of the Fourier domain*/
 	FFT_backward(b);
 #endif
-
+	// ========== [이곳에 출력 코드 추가] ==========
+    static int p_gen = 0;
+    if (p_gen == 0) {
+        printf("\n========== [과정 1. 키 생성 (KeyGen)] ==========\n");
+        printf("b = As + e mod q (q = 12289)\n");
+        printf(" - [A] 공유 행렬/다항식 (a) : %u\n", (unsigned int)a[0]);
+        printf(" - [s] 앨리스 비밀키 (s)    : %u\n", (unsigned int)s[0]);
+        printf(" - [e] 작은 오류 (e)        : %u\n", (unsigned int)s[m]); // s+m이 오류 e 역할을 함
+        printf(" - [b] 앨리스 공개키 (b)    : %u\n", (unsigned int)b[0]);
+        p_gen = 1;
+    }
 }
 
 /* Encapsulation routine. Returns an element in R_q x R_2
@@ -641,7 +651,21 @@ void KEM1_Encapsulate(RINGELT u[m], uint64_t cr_v[recwords], uint64_t mu[muwords
 	POINTWISE_ADD(v, v, e+2*m); //Create v = e0*b+e2
 	
 	help_rec(mu, cr_v, v);
-	  
+
+	// ========== [이곳에 출력 코드 추가] ==========
+    static int p_enc = 0;
+    if (p_enc == 0) {
+        printf("\n========== [과정 2. 암호화 및 힌트 생성 (Encrypt)] ==========\n");
+        printf("u = A^T*r + e1, v = b^T*r + e2 + μ\n");
+        printf(" - [r]  임시 랜덤 벡터 (r)  : %u\n", (unsigned int)e[0]);
+        printf(" - [e1] 새로운 오차 1 (e1)  : %u\n", (unsigned int)e[m]);
+        printf(" - [e2] 새로운 오차 2 (e2)  : %u\n", (unsigned int)e[2*m]);
+        printf(" - [u]  밥의 암호문 (u)     : %u\n", (unsigned int)u[0]);
+        printf(" - [v]  밥의 내부 연산값(v) : %u\n", (unsigned int)v[0]);
+        printf(" - [μ]  인코딩된 메시지 (mu): %016lx\n", (unsigned long)mu[0]);
+        printf(" - [cr] 교차점 힌트 (cr_v)  : %016lx\n", (unsigned long)cr_v[0]);
+        p_enc = 1;
+    }
 }
 
 /* Decapsulation routine.
@@ -663,5 +687,16 @@ void KEM1_Decapsulate(uint64_t mu[muwords], RINGELT u[m], RINGELT s_1[m], uint64
 	MAPTOCYCLOTOMIC(w);
 
 	rec(mu, w, cr_v);
-
+	// ========== [이곳에 출력 코드 추가] ==========
+    static int p_dec = 0;
+    if (p_dec == 0) {
+        printf("\n========== [과정 3. 복호화 (Decrypt) 및 오차 상쇄] ==========\n");
+        printf("v - s^T*u = μ + error 식을 이용하여 메시지 복구\n");
+        printf(" - [u]  받은 밥의 암호문 (u): %u\n", (unsigned int)u[0]);
+        printf(" - [s]  앨리스 비밀키 (s)   : %u\n", (unsigned int)s_1[0]);
+        printf(" - [su] 앨리스 연산값 (s*u) : %u\n", (unsigned int)w[0]);
+        printf(" - [μ]  복구된 메시지 (mu)  : %016lx\n", (unsigned long)mu[0]);
+        printf("===============================================================\n\n");
+        p_dec = 1;
+	}
 }
