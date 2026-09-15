@@ -11,3 +11,6 @@ CRYPTO_CIPHERTEXTBYTES: 2208
 gksdbwns@DESKTOP-PDHFAPH:~/cpp_study/pqc03/newhope-master/ref$ echo $?
 0
 
+main.c 실행
+gcc -O3 -o my_test main.c ccakem.c cpapke.c poly.c ntt.c precomp.c reduce.c verify.c fips202.c randombytes.c
+./my_test
