@@ -265,7 +265,7 @@ void cpapke_dec(unsigned char *m,
   poly_sub(&tmp, &vprime, &tmp);
 
   // ================= [여기부터 추가] =================
-  printf("오류가 포함된 복원 메시지 (v - us)의 계수: ");
+  printf("오류가 포함된 복원 메시지 (v - v')의 계수: ");
   // 이론상 0 근처이거나 q/2(약 6144) 근처의 값이 나와야 합니다.
   for(int i=0; i<5; i++) printf("%d ", tmp.coeffs[i]);
   printf("\n=============================\n");

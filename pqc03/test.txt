@@ -14,3 +14,6 @@ gksdbwns@DESKTOP-PDHFAPH:~/cpp_study/pqc03/newhope-master/ref$ echo $?
 main.c 실행
 gcc -O3 -o my_test main.c ccakem.c cpapke.c poly.c ntt.c precomp.c reduce.c verify.c fips202.c randombytes.c
 ./my_test
+
+[Bob] 단계 두 번 출력된 이유는 
+CCA(Chosen-Ciphertext Attack) 안전성을 달성하기 위한 Fujisaki-Okamoto(FO) 변환의 "재암호화(Re-encryption)" 과정 때문
