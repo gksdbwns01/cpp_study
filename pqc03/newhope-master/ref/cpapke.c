@@ -110,14 +110,40 @@ void cpapke_keypair(unsigned char *pk,
 
   gen_a(&ahat, publicseed);
 
+  // 1. 비밀 다항식 s 생성 (중심이항분포)
   poly_sample(&shat, noiseseed, 0);
+  
+  // ================= [여기부터 추가] =================
+  printf("\n[Alice - KeyGen 단계]\n");
+  printf("NTT 변환 전 비밀 다항식 s의 계수 (앞 5개): ");
+  // 중심이항분포로 뽑혀 아주 작은 값(예: 0, 1, -1, 2 등)이 나올 것입니다.
+  for(int i=0; i<5; i++) printf("%d ", shat.coeffs[i]);
+  printf("\n");
+  // ===================================================
+  
   poly_ntt(&shat);
 
+  // 2. 오류 다항식 e 생성 (중심이항분포)
   poly_sample(&ehat, noiseseed, 1);
+  
+  // ================= [여기부터 추가] =================
+  printf("NTT 변환 전 오류 다항식 e의 계수 (앞 5개): ");
+  for(int i=0; i<5; i++) printf("%d ", ehat.coeffs[i]);
+  printf("\n");
+  // ===================================================
+  
   poly_ntt(&ehat);
 
+  // 3. b = a * s + e 계산
   poly_mul_pointwise(&ahat_shat, &shat, &ahat);
   poly_add(&bhat, &ehat, &ahat_shat);
+
+  // ================= [여기부터 추가] =================
+  printf("공개 다항식 b (b = as + e)의 계수 (앞 5개): ");
+  // b는 q(12289) 범위 내의 큰 값들로 채워져 있을 것입니다.
+  for(int i=0; i<5; i++) printf("%d ", bhat.coeffs[i]);
+  printf("\n=============================\n");
+  // ===================================================
 
   poly_tobytes(sk, &shat);
   encode_pk(pk, &bhat, publicseed);
@@ -144,26 +170,57 @@ void cpapke_enc(unsigned char *c,
   poly sprime, eprime, vprime, ahat, bhat, eprimeprime, uhat, v;
   unsigned char publicseed[NEWHOPE_SYMBYTES];
 
+  // 메시지 m을 다항식 v(이론의 mu)로 인코딩: 0은 0으로, 1은 q/2 근처로 변환됨
   poly_frommsg(&v, m);
 
   decode_pk(&bhat, publicseed, pk);
   gen_a(&ahat, publicseed);
 
+  // Bob의 작은 임시 비밀/오류 다항식 생성 (중심이항분포)
   poly_sample(&sprime, coin, 0);
   poly_sample(&eprime, coin, 1);
   poly_sample(&eprimeprime, coin, 2);
 
+  // ================= [여기부터 추가] =================
+  printf("\n[Bob - Encrypt 단계]\n");
+  printf("NTT 변환 전 비밀 다항식 s'의 계수 (앞 5개): ");
+  for(int i=0; i<5; i++) printf("%d ", sprime.coeffs[i]);
+  printf("\n");
+
+  printf("NTT 변환 전 오류 다항식 e'의 계수 (앞 5개): ");
+  for(int i=0; i<5; i++) printf("%d ", eprime.coeffs[i]);
+  printf("\n");
+
+  printf("NTT 변환 전 추가 오류 다항식 e''의 계수 (앞 5개): ");
+  for(int i=0; i<5; i++) printf("%d ", eprimeprime.coeffs[i]);
+  printf("\n");
+  
+  printf("인코딩된 메시지 (mu)의 계수 (앞 5개): ");
+  // 이론상 0 또는 q/2 (약 6144) 근처의 값이 나와야 합니다.
+  for(int i=0; i<5; i++) printf("%d ", v.coeffs[i]);
+  printf("\n");
+  // ===================================================
+
   poly_ntt(&sprime);
   poly_ntt(&eprime);
 
+  // u = as' + e' 계산 (NTT 도메인에서 수행)
   poly_mul_pointwise(&uhat, &ahat, &sprime);
   poly_add(&uhat, &uhat, &eprime);
 
+  // bs' 계산 및 역변환 (Inverse NTT)
   poly_mul_pointwise(&vprime, &bhat, &sprime);
   poly_invntt(&vprime);
 
+  // v = bs' + e'' + mu (메시지 추가) 계산 (일반 도메인에서 수행)
   poly_add(&vprime, &vprime, &eprimeprime);
   poly_add(&vprime, &vprime, &v); // add message
+
+  // ================= [여기부터 추가] =================
+  printf("최종 암호문 v (bs' + e'' + mu)의 계수 (앞 5개): ");
+  for(int i=0; i<5; i++) printf("%d ", vprime.coeffs[i]);
+  printf("\n=============================\n");
+  // ===================================================
 
   encode_c(c, &uhat, &vprime);
 }
@@ -186,13 +243,34 @@ void cpapke_dec(unsigned char *m,
 {
   poly vprime, uhat, tmp, shat;
 
+  // 1. 비밀키 s를 불러옴
   poly_frombytes(&shat, sk);
 
+  // 2. 암호문 c에서 u와 v를 분리
   decode_c(&uhat, &vprime, c);
+  
+  // 3. u * s 계산 (NTT 도메인에서 곱셈 후 Inverse NTT로 복원)
   poly_mul_pointwise(&tmp, &shat, &uhat);
-  poly_invntt(&tmp);
+  poly_invntt(&tmp); // 여기서 tmp가 이론상의 v' (us)가 됩니다.
 
+  // ================= [여기부터 추가] =================
+  printf("\n[Alice - Decrypt 단계]\n");
+  printf("Alice가 계산한 v' (us)의 계수 (앞 5개): ");
+  // 앞서 Bob 단계에서 출력한 v의 계수와 값이 얼마나 비슷한지 비교해 보세요!
+  for(int i=0; i<5; i++) printf("%d ", tmp.coeffs[i]);
+  printf("\n");
+  // ===================================================
+
+  // 4. (us - v) 계산: 메시지와 작은 오류만 남기는 과정
   poly_sub(&tmp, &tmp, &vprime);
 
+  // ================= [여기부터 추가] =================
+  printf("오류가 포함된 복원 메시지 (us - v)의 계수 (앞 5개): ");
+  // 이론상 0 근처이거나 q/2(약 6144) 근처의 값이 나와야 합니다.
+  for(int i=0; i<5; i++) printf("%d ", tmp.coeffs[i]);
+  printf("\n=============================\n");
+  // ===================================================
+
+  // 5. 0 또는 q/2 근처인지 판단하여 최종 비트(0 또는 1)로 디코딩
   poly_tomsg(m, &tmp);
 }
