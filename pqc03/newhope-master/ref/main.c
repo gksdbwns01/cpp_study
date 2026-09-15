@@ -10,7 +10,7 @@ int main() {
     unsigned char ss_b[CRYPTO_BYTES]; // Bob의 최종 공유키
 
     printf("\n=========================================\n");
-    printf("   NewHope1024 단일 실행 테스트 시작\n");
+    printf("   NewHope1024 테스트\n");
     printf("=========================================\n");
 
     // 1. Alice: 공개키(pk)와 비밀키(sk) 생성
@@ -26,6 +26,18 @@ int main() {
     // 3. Alice: 암호문을 받아 복호화하고 공유 비밀키(ss_a) 복원
     crypto_kem_dec(ss_a, ct, sk);
 
+    printf("\n[최종 공유 비밀키 확인]\n");
+    printf("Bob의 공유 비밀키   (ss_b): ");
+    for(int i = 0; i < CRYPTO_BYTES; i++) {
+        printf("%02X", ss_b[i]);
+    }
+    printf("\n");
+
+    printf("Alice의 공유 비밀키 (ss_a): ");
+    for(int i = 0; i < CRYPTO_BYTES; i++) {
+        printf("%02X", ss_a[i]);
+    }
+    printf("\n");
     // 4. 결과 확인 (두 키가 일치하는지 비교)
     printf("\n=========================================\n");
     if(memcmp(ss_a, ss_b, CRYPTO_BYTES) == 0) {

@@ -114,8 +114,8 @@ void cpapke_keypair(unsigned char *pk,
   poly_sample(&shat, noiseseed, 0);
   
   // ================= [여기부터 추가] =================
-  printf("\n[Alice - KeyGen 단계]\n");
-  printf("NTT 변환 전 비밀 다항식 s의 계수 (앞 5개): ");
+  printf("\n[Alice - KeyGen]\n");
+  printf(" 비밀 다항식 s의 계수: ");
   // 중심이항분포로 뽑혀 아주 작은 값(예: 0, 1, -1, 2 등)이 나올 것입니다.
   for(int i=0; i<5; i++) printf("%d ", shat.coeffs[i]);
   printf("\n");
@@ -127,7 +127,7 @@ void cpapke_keypair(unsigned char *pk,
   poly_sample(&ehat, noiseseed, 1);
   
   // ================= [여기부터 추가] =================
-  printf("NTT 변환 전 오류 다항식 e의 계수 (앞 5개): ");
+  printf(" 오류 다항식 e의 계수: ");
   for(int i=0; i<5; i++) printf("%d ", ehat.coeffs[i]);
   printf("\n");
   // ===================================================
@@ -139,7 +139,7 @@ void cpapke_keypair(unsigned char *pk,
   poly_add(&bhat, &ehat, &ahat_shat);
 
   // ================= [여기부터 추가] =================
-  printf("공개 다항식 b (b = as + e)의 계수 (앞 5개): ");
+  printf("공개 다항식 b (b = as + e)의 계수: ");
   // b는 q(12289) 범위 내의 큰 값들로 채워져 있을 것입니다.
   for(int i=0; i<5; i++) printf("%d ", bhat.coeffs[i]);
   printf("\n=============================\n");
@@ -182,20 +182,20 @@ void cpapke_enc(unsigned char *c,
   poly_sample(&eprimeprime, coin, 2);
 
   // ================= [여기부터 추가] =================
-  printf("\n[Bob - Encrypt 단계]\n");
-  printf("NTT 변환 전 비밀 다항식 s'의 계수 (앞 5개): ");
+  printf("\n[Bob]\n");
+  printf(" 비밀 다항식 s'의 계수: ");
   for(int i=0; i<5; i++) printf("%d ", sprime.coeffs[i]);
   printf("\n");
 
-  printf("NTT 변환 전 오류 다항식 e'의 계수 (앞 5개): ");
+  printf(" 오류 다항식 e'의 계수: ");
   for(int i=0; i<5; i++) printf("%d ", eprime.coeffs[i]);
   printf("\n");
 
-  printf("NTT 변환 전 추가 오류 다항식 e''의 계수 (앞 5개): ");
+  printf(" 추가 오류 다항식 e''의 계수: ");
   for(int i=0; i<5; i++) printf("%d ", eprimeprime.coeffs[i]);
   printf("\n");
   
-  printf("인코딩된 메시지 (mu)의 계수 (앞 5개): ");
+  printf("인코딩된 메시지 (mu)의 계수: ");
   // 이론상 0 또는 q/2 (약 6144) 근처의 값이 나와야 합니다.
   for(int i=0; i<5; i++) printf("%d ", v.coeffs[i]);
   printf("\n");
@@ -217,7 +217,7 @@ void cpapke_enc(unsigned char *c,
   poly_add(&vprime, &vprime, &v); // add message
 
   // ================= [여기부터 추가] =================
-  printf("최종 암호문 v (bs' + e'' + mu)의 계수 (앞 5개): ");
+  printf("최종 암호문 v (bs' + e'' + mu)의 계수: ");
   for(int i=0; i<5; i++) printf("%d ", vprime.coeffs[i]);
   printf("\n=============================\n");
   // ===================================================
@@ -254,8 +254,8 @@ void cpapke_dec(unsigned char *m,
   poly_invntt(&tmp); // 여기서 tmp가 이론상의 v' (us)가 됩니다.
 
   // ================= [여기부터 추가] =================
-  printf("\n[Alice - Decrypt 단계]\n");
-  printf("Alice가 계산한 v' (us)의 계수 (앞 5개): ");
+  printf("\n[Alice]\n");
+  printf("Alice가 계산한 v' (us)의 계수: ");
   // 앞서 Bob 단계에서 출력한 v의 계수와 값이 얼마나 비슷한지 비교해 보세요!
   for(int i=0; i<5; i++) printf("%d ", tmp.coeffs[i]);
   printf("\n");
@@ -265,7 +265,7 @@ void cpapke_dec(unsigned char *m,
   poly_sub(&tmp, &vprime, &tmp);
 
   // ================= [여기부터 추가] =================
-  printf("오류가 포함된 복원 메시지 (v - us)의 계수 (앞 5개): ");
+  printf("오류가 포함된 복원 메시지 (v - us)의 계수: ");
   // 이론상 0 근처이거나 q/2(약 6144) 근처의 값이 나와야 합니다.
   for(int i=0; i<5; i++) printf("%d ", tmp.coeffs[i]);
   printf("\n=============================\n");
