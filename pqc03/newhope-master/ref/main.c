@@ -20,8 +20,8 @@ int main() {
     crypto_kem_enc(ct, ss_b, pk);
 
     // [옵션] PDF 15페이지의 '의도적 오류 주입'을 테스트하려면 아래 주석을 해제하세요.
-    // printf("\n[!] 네트워크 전송 중 암호문 첫 바이트 변조\n");
-    // ct[0] = 0xFF; 
+    printf("\n네트워크 전송 중 암호문 첫 바이트 변조\n");
+    ct[0] = 0xFF; 
 
     // 3. Alice: 암호문을 받아 복호화하고 공유 비밀키(ss_a) 복원
     crypto_kem_dec(ss_a, ct, sk);
