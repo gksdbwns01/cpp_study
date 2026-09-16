@@ -169,7 +169,12 @@ void cpapke_enc(unsigned char *c,
 {
   poly sprime, eprime, vprime, ahat, bhat, eprimeprime, uhat, v;
   unsigned char publicseed[NEWHOPE_SYMBYTES];
-
+  // ================= [여기부터 추가] =================
+  printf("\n[Bob - 메시지 인코딩]\n");
+  printf("원본 메시지 (m, 수식의 mu에 대응하는 입력 메시지) 32바이트: ");
+  for(int i=0; i<NEWHOPE_SYMBYTES; i++) printf("%02X", m[i]);
+  printf("\n");
+  // ===================================================
   // 메시지 m을 다항식 v(이론의 mu)로 인코딩: 0은 0으로, 1은 q/2 근처로 변환됨
   poly_frommsg(&v, m);
 
@@ -273,4 +278,9 @@ void cpapke_dec(unsigned char *m,
 
   // 5. 0 또는 q/2 근처인지 판단하여 최종 비트(0 또는 1)로 디코딩
   poly_tomsg(m, &tmp);
+  // ================= [여기부터 추가] =================
+  printf("디코딩된 최종 메시지 (m, 수식의 mu에 대응하는 입력 메시지): ");
+  for(int i=0; i<NEWHOPE_SYMBYTES; i++) printf("%02X", m[i]);
+  printf("\n=============================\n");
+  // ===================================================
 }
