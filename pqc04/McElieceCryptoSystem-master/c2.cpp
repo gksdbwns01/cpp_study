@@ -285,26 +285,45 @@ void adderror(mat& cipher, int weight)
 		cipher(i,0) = ((unsigned int)cipher(i,0))%2;
 	}
 }
-
 mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, const Field_t GF){
+    // 내부 디버그 출력을 위한 인라인 람다 함수
+    static int call_count = 0;
+    bool is_verbose = (call_count == 0); // 첫 번째 블록 디코딩 시에만 과정 출력
+    call_count++;
+
+    auto print_part = [&](const string& name, const mat& A, int limit = 20) {
+        if(!is_verbose) return;
+        cout << name << " =" << endl;
+        int count = 0;
+        for (unsigned int i = 0; i < A.n_elem; ++i) {
+            cout << (unsigned int)A(i) << " ";
+            count++;
+            if (count >= limit) { cout << "..."; break; }
+        }
+        cout << endl << endl;
+    };
+
     Poly_t z;
-    z.degree = 1;
-    z.coefficient[0] = 0;
-    z.coefficient[1] = 1;
+    z.degree = 1; z.coefficient[0] = 0; z.coefficient[1] = 1;
 
     mat error_codeword = ciphertext*P.t();
+    for(unsigned int i=0; i<error_codeword.n_elem; ++i) 
+        error_codeword(i) = ((int)error_codeword(i)) % 2;
+    
+    print_part("cP^-1", error_codeword);
+
     mat syndrome = H*error_codeword.t();
     for(unsigned int i = 0; i < H.n_rows; i++) syndrome(i, 0) = ((int)syndrome(i, 0))%2;
+    
+    if(is_verbose) cout << "syndrome = H(cP^-1)^T" << endl;
+    print_part("syndrome", syndrome);
 
-    // express syndrome s(z) as an array of coefficients of a polynomial of degree degree
+    // [기존 코드 동일] express syndrome s(z) ~ Euclidean steps...
     Poly_t s_z;
     s_z.degree = g_z.degree - 1;
     for(unsigned i = 0; i < s_z.degree + 1; i++) s_z.coefficient[i] = vec2int(syndrome.rows(8*i, 8*(i + 1) - 1), 8);
-    while(s_z.coefficient[s_z.degree] == 0){
-        s_z.degree--;
-    }
+    while(s_z.coefficient[s_z.degree] == 0) s_z.degree--;
 
-    // calculate sigma(z)
     Poly_t h_z = Euclidean_inv(s_z, g_z, GF);
     Poly_t d_2_z = Euclidean_add_p(h_z, z, GF);
     for(unsigned i = 0; i < 8*g_z.degree - 1; i++){
@@ -312,41 +331,31 @@ mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, co
     }
     Poly_t d_z = d_2_z;
 
-    Poly_t a_z;
-    Poly_t b_z;
+    Poly_t a_z; Poly_t b_z;
     Poly_t d_i_z = Euclidean_inv(d_z, g_z, GF);
+    
+    // (중략: 기존 c2.cpp의 짝수/홀수 차수 처리 유클리드 알고리즘 부분 그대로 유지)
     if(g_z.degree%2){
         if(d_i_z.degree == (g_z.degree - 1)/2){
-            a_z.degree = 0;
-            a_z.coefficient[0] = 1;
-            b_z = d_i_z;
+            a_z.degree = 0; a_z.coefficient[0] = 1; b_z = d_i_z;
         }else if(d_i_z.degree < (g_z.degree - 1)/2){
             a_z = Euclidean_pow(z, g_z, (g_z.degree - 1)/2 - d_i_z.degree, GF);
             b_z = Euclidean_mult_pp(d_i_z, a_z, GF);
         }else{
             Poly_t r_1, r_0, u_1, u_0, v_1, v_0;
-            u_1.degree = 0;
-            u_1.coefficient[0] = 1;
-            u_0.degree = 0;
-            u_0.coefficient[0] = 0;
-            v_1.degree = 0;
-            v_1.coefficient[0] = 0;
-            v_0.degree = 0;
-            v_0.coefficient[0] = 1;
-            r_1 = g_z;
-            r_0 = d_i_z;
+            u_1.degree = 0; u_1.coefficient[0] = 1;
+            u_0.degree = 0; u_0.coefficient[0] = 0;
+            v_1.degree = 0; v_1.coefficient[0] = 0;
+            v_0.degree = 0; v_0.coefficient[0] = 1;
+            r_1 = g_z; r_0 = d_i_z;
             while((r_0.degree != 0)||(r_0.coefficient[0] != 0)){
                 Poly_t quotient = Euclidean_div_pp(r_1, r_0, GF);
-
                 Poly_t remainder = Euclidean_add_p(r_1, Euclidean_mult_pp(r_0, quotient, GF), GF);
                 Poly_t temp_u = Euclidean_add_p(u_1, Euclidean_mult_pp(u_0, quotient, GF), GF);
                 Poly_t temp_v = Euclidean_add_p(v_1, Euclidean_mult_pp(v_0, quotient, GF), GF);
-                r_1 = r_0;
-                r_0 = remainder;
-                u_1 = u_0;
-                u_0 = temp_u;
-                v_1 = v_0;
-                v_0 = temp_v;
+                r_1 = r_0; r_0 = remainder;
+                u_1 = u_0; u_0 = temp_u;
+                v_1 = v_0; v_0 = temp_v;
                 if(r_1.degree == (g_z.degree - 1)/2){
                     b_z = r_1;
                     a_z = Euclidean_modp(Euclidean_mult_pp(d_z, b_z, GF), g_z, GF);
@@ -356,36 +365,25 @@ mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, co
         }
     }else{
         if(d_z.degree == g_z.degree/2){
-            b_z.degree = 0;
-            b_z.coefficient[0] = 1;
-            a_z = d_z;
+            b_z.degree = 0; b_z.coefficient[0] = 1; a_z = d_z;
         }else if(d_z.degree < g_z.degree/2){
             b_z = Euclidean_pow(z, g_z, g_z.degree/2 - d_z.degree, GF);
             a_z = Euclidean_mult_pp(d_z, b_z, GF);
         }else{
             Poly_t r_1, r_0, u_1, u_0, v_1, v_0;
-            u_1.degree = 0;
-            u_1.coefficient[0] = 1;
-            u_0.degree = 0;
-            u_0.coefficient[0] = 0;
-            v_1.degree = 0;
-            v_1.coefficient[0] = 0;
-            v_0.degree = 0;
-            v_0.coefficient[0] = 1;
-            r_1 = g_z;
-            r_0 = d_z;
+            u_1.degree = 0; u_1.coefficient[0] = 1;
+            u_0.degree = 0; u_0.coefficient[0] = 0;
+            v_1.degree = 0; v_1.coefficient[0] = 0;
+            v_0.degree = 0; v_0.coefficient[0] = 1;
+            r_1 = g_z; r_0 = d_z;
             while((r_0.degree != 0)||(r_0.coefficient[0] != 0)){
                 Poly_t quotient = Euclidean_div_pp(r_1, r_0, GF);
-
                 Poly_t remainder = Euclidean_add_p(r_1, Euclidean_mult_pp(r_0, quotient, GF), GF);
                 Poly_t temp_u = Euclidean_add_p(u_1, Euclidean_mult_pp(u_0, quotient, GF), GF);
                 Poly_t temp_v = Euclidean_add_p(v_1, Euclidean_mult_pp(v_0, quotient, GF), GF);
-                r_1 = r_0;
-                r_0 = remainder;
-                u_1 = u_0;
-                u_0 = temp_u;
-                v_1 = v_0;
-                v_0 = temp_v;
+                r_1 = r_0; r_0 = remainder;
+                u_1 = u_0; u_0 = temp_u;
+                v_1 = v_0; v_0 = temp_v;
                 if(r_1.degree == g_z.degree/2){
                     a_z = r_1;
                     b_z = Euclidean_modp(Euclidean_mult_pp(d_i_z, b_z, GF), g_z, GF);
@@ -410,7 +408,24 @@ mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, co
         }
     }
 
-    // get m
+    // --- 디버그용 변수 추출 시작 ---
+    // codeword는 에러가 수정된 벡터 (즉, m'G)
+    mat e_prime = error_codeword - codeword;
+    int wt_e_prime = 0;
+    for(unsigned int i = 0; i < e_prime.n_elem; ++i) {
+        e_prime(i) = (((int)e_prime(i))%2 + 2)%2;
+        if(e_prime(i) == 1) wt_e_prime++;
+    }
+    
+    print_part("e'", e_prime);
+    if(is_verbose) cout << "wt(e') = " << wt_e_prime << "\n\n";
+    
+    if(is_verbose) cout << "cP^-1 - e' (= m'G)" << endl;
+    print_part("m'G", codeword);
+    // --- 디버그용 변수 추출 끝 ---
+
+
+    // get m (Gaussian Elimination)
     mat temp_g = join_horiz(G.t(), codeword.t());
     for(unsigned int j = 0; j < G.n_rows; j++){
         unsigned int i = j;
@@ -420,16 +435,26 @@ mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, co
         for(i = 0; i < G.n_cols; i++){
             if(temp_g(i, j)&&(i != j)){
                 for(unsigned int k = 0; k < G.n_rows + 1; k++){
-                    temp_g(i, k) = ((unsigned int)temp_g (i, k) + (unsigned int)temp_g (j, k))%2;
+                    temp_g(i, k) = ((unsigned int)temp_g(i, k) + (unsigned int)temp_g(j, k))%2;
                 }
             }
         }
     }
-    mat retrieve = temp_g(span(0, G.n_rows - 1), span(G.n_rows, G.n_rows)).t()*S.t();
+    
+    // --- 디버그용 변수 추출 (m') ---
+    mat m_prime = temp_g(span(0, G.n_rows - 1), span(G.n_rows, G.n_rows)).t();
+    for(unsigned i = 0; i < m_prime.n_cols; i++) m_prime(0, i) = ((unsigned)m_prime(0, i))%2;
+    print_part("m'", m_prime);
 
+    // Final m recovery
+    mat retrieve = m_prime * S.t();
     for(unsigned i = 0; i < retrieve.n_cols; i++){
         retrieve(0, i) = ((unsigned)retrieve(0, i))%2;
     }
+    
+    if(is_verbose) cout << "m = m' * S^-1" << endl;
+    print_part("m", retrieve);
+
     return retrieve;
 }
 
