@@ -459,7 +459,7 @@ bool SpecialCase(unsigned int part[])
 	return (flag1 || flag2);
 }
 
-int main(int argc, char const *argv[])
+int legacy_main(int argc, char const *argv[])
 {
 	if ((string)argv[1] == "key")
 	{
