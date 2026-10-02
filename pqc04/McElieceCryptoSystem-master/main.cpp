@@ -58,11 +58,36 @@ string bits_to_string(const mat& bits)
     }
     return result;
 }
-
+// ============================================================
+// 디버그용 부분 출력 함수 (크기 + 일부 원소 출력)
+// ============================================================
+void print_preview(const string& name, const mat& A, int limit = 20)
+{
+    cout << name << " (" << A.n_rows << " x " << A.n_cols << ")" << endl;
+    
+    if (A.n_rows > 1 && A.n_cols > 1) {
+        // 행렬인 경우 첫 번째 행 출력
+        cout << "first row:" << endl;
+        int count = 0;
+        for (unsigned int j = 0; j < A.n_cols; ++j) {
+            cout << (unsigned int)A(0, j) << " ";
+            if (++count >= limit) { cout << "..."; break; }
+        }
+    } else {
+        // 벡터인 경우 (1 x N 또는 N x 1)
+        cout << "values:" << endl;
+        int count = 0;
+        for (unsigned int i = 0; i < A.n_elem; ++i) {
+            cout << (unsigned int)A(i) << " ";
+            if (++count >= limit) { cout << "..."; break; }
+        }
+    }
+    cout << endl << endl;
+}
 int main()
 {
     cout << "========================================" << endl;
-    cout << "        McEliece Demonstration" << endl;
+    cout << "        McEliece 암호화/복호화" << endl;
     cout << "========================================" << endl;
 
     // [1] Key Generation
@@ -71,12 +96,13 @@ int main()
     mat H, G, S, P, Gpub;
     mykeygen(H, G, S, P, Gpub, false);
 
-    // 원소값 확인
-    print_partial("S", S);
-    print_partial("P", P);
+    print_preview("G", G);
+    print_preview("S", S);
+    print_preview("P", P);
+    
+    // cout << "※ S, P는 permutation matrix이므로 S^-1 = S^T, P^-1 = P^T 가 성립함." << endl;
     cout << "Gpub = S * G * P" << endl;
-    print_partial("Gpub", Gpub);
-
+    print_preview("Gpub", Gpub);
 
     // [2] Plaintext
     string plaintext = "12345678901234567890123456789012345678";
@@ -91,45 +117,48 @@ int main()
     for (int i = 1; i < 19; ++i)
         blk2 = join_cols(blk2, int2vec((unsigned int)(unsigned char)plaintext2[i], 8));
 
-    // [3] Encryption (Block 1을 기준으로 상세 출력)
-    cout << "\n[Encryption] (Block 1 Trace)" << endl;
+    // [3] Encryption (Block 1 Trace)
+    cout << "\n[Encryption] (블록 처리 과정)" << endl;
     cout << "----------------------------------------" << endl;
     
     mat cipher1 = trans(blk1) * Gpub;
     cipher1 = trans(cipher1); // 256x1 벡터화
     
-    // 이진화 (mod 2) 적용
     for (unsigned int i = 0; i < cipher1.n_elem; ++i) 
         cipher1(i) = ((unsigned int)cipher1(i)) % 2;
     
-    mat mGpub1 = cipher1; // 에러 더하기 전 상태 저장
+    mat mGpub1 = cipher1;
 
-    print_partial("m", blk1);
-    print_partial("m * Gpub", mGpub1);
+    print_preview("m", blk1);
+    print_preview("m * Gpub", mGpub1);
 
-    // 에러 추가 및 역산하여 e 벡터 추출
     adderror(cipher1, 13);
     
     mat e1 = cipher1 - mGpub1;
     for (unsigned int i = 0; i < e1.n_elem; ++i) 
-        e1(i) = (((int)e1(i)) % 2 + 2) % 2; // 음수 모듈러 방지
+        e1(i) = (((int)e1(i)) % 2 + 2) % 2;
 
-    print_partial("e", e1);
+    print_preview("e", e1);
     cout << "wt(e) = " << hamming_weight(e1) << endl << endl;
 
     cout << "c = mGpub + e" << endl;
-    print_partial("c", cipher1);
-
-    // Block 2 처리 (디버그 출력 생략)
+    print_preview("c", cipher1);
+    // ==========================================================
+    // 여기에 아래의 Block 2 처리 및 cipher 병합 코드를 추가하세요.
+    // ==========================================================
     mat cipher2 = trans(blk2) * Gpub;
-    cipher2 = trans(cipher2);
-    for (unsigned int i = 0; i < cipher2.n_elem; ++i) cipher2(i) = ((unsigned int)cipher2(i)) % 2;
+    cipher2 = trans(cipher2); 
+    
+    for (unsigned int i = 0; i < cipher2.n_elem; ++i) 
+        cipher2(i) = ((unsigned int)cipher2(i)) % 2;
+    
     adderror(cipher2, 13);
-    mat cipher = join_cols(cipher1, cipher2);
-
+    
+    mat cipher = join_cols(cipher1, cipher2); // cipher 변수 정의 완료
+    // ==========================================================
 
     // [4] Decryption 준비
-    cout << "\n[Decryption] (Block 1 Trace)" << endl;
+    cout << "\n[Decryption] (블록 처리 과정)" << endl;
     cout << "----------------------------------------" << endl;
     mat cipher_block1 = trans(cipher.rows(0, 255));
     mat cipher_block2 = trans(cipher.rows(256, 511));
@@ -151,7 +180,7 @@ int main()
     // decrypt_one 내부에서 디버그 내용이 출력됨
     mat plain1 = decrypt_one(H, G, S, P, cipher_block1, GZ, GF);
     
-    cout << "\n--- Block 2 Decoding (Silenced) ---" << endl;
+    // cout << "\n--- Block 2 Decoding (Silenced) ---" << endl;
     mat plain2 = decrypt_one(H, G, S, P, cipher_block2, GZ, GF); // 두 번째 블록 복호화
 
     // Recover plaintext
@@ -165,7 +194,7 @@ int main()
     cout << "\n========================================" << endl;
     cout << "Original  : " << plaintext << endl;
     cout << "Recovered : " << recovered << endl;
-    if (plaintext == recovered) cout << "SUCCESS! (Plaintext == Recovered)" << endl;
+    if (plaintext == recovered) cout << "SUCCESS! (원본 평문 == 복원된 평문)" << endl;
     cout << "========================================" << endl;
 
     return 0;

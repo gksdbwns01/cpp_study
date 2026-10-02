@@ -286,36 +286,49 @@ void adderror(mat& cipher, int weight)
 	}
 }
 mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, const Field_t GF){
-    // 내부 디버그 출력을 위한 인라인 람다 함수
     static int call_count = 0;
-    bool is_verbose = (call_count == 0); // 첫 번째 블록 디코딩 시에만 과정 출력
+    bool is_verbose = (call_count == 0);
     call_count++;
 
+    // 내부 출력용 람다 함수 (print_preview 구조와 동일하게 작성)
     auto print_part = [&](const string& name, const mat& A, int limit = 20) {
         if(!is_verbose) return;
-        cout << name << " =" << endl;
-        int count = 0;
-        for (unsigned int i = 0; i < A.n_elem; ++i) {
-            cout << (unsigned int)A(i) << " ";
-            count++;
-            if (count >= limit) { cout << "..."; break; }
+        cout << name << " (" << A.n_rows << " x " << A.n_cols << ")" << endl;
+        if (A.n_rows > 1 && A.n_cols > 1) {
+            cout << "first row:" << endl;
+            int count = 0;
+            for (unsigned int j = 0; j < A.n_cols; ++j) {
+                cout << (unsigned int)A(0, j) << " ";
+                if (++count >= limit) { cout << "..."; break; }
+            }
+        } else {
+            cout << "values:" << endl;
+            int count = 0;
+            for (unsigned int i = 0; i < A.n_elem; ++i) {
+                cout << (unsigned int)A(i) << " ";
+                if (++count >= limit) { cout << "..."; break; }
+            }
         }
         cout << endl << endl;
     };
 
-    Poly_t z;
-    z.degree = 1; z.coefficient[0] = 0; z.coefficient[1] = 1;
+    Poly_t z; z.degree = 1; z.coefficient[0] = 0; z.coefficient[1] = 1;
 
+    // c * P^T 연산
     mat error_codeword = ciphertext*P.t();
     for(unsigned int i=0; i<error_codeword.n_elem; ++i) 
         error_codeword(i) = ((int)error_codeword(i)) % 2;
     
+    if(is_verbose) {
+        // cout << "※ P는 permutation matrix이므로 P^-1 = P^T" << endl;
+        // cout << "따라서 cP^-1 = cP^T 로 계산됨" << endl;
+    }
     print_part("cP^-1", error_codeword);
 
     mat syndrome = H*error_codeword.t();
     for(unsigned int i = 0; i < H.n_rows; i++) syndrome(i, 0) = ((int)syndrome(i, 0))%2;
     
-    if(is_verbose) cout << "syndrome = H(cP^-1)^T" << endl;
+    if(is_verbose) cout << "s = H(cP^-1)^T" << endl;
     print_part("syndrome", syndrome);
 
     // [기존 코드 동일] express syndrome s(z) ~ Euclidean steps...
@@ -422,10 +435,8 @@ mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, co
     
     if(is_verbose) cout << "cP^-1 - e' (= m'G)" << endl;
     print_part("m'G", codeword);
-    // --- 디버그용 변수 추출 끝 ---
 
-
-    // get m (Gaussian Elimination)
+    // Gaussian Elimination을 통한 m' 추출
     mat temp_g = join_horiz(G.t(), codeword.t());
     for(unsigned int j = 0; j < G.n_rows; j++){
         unsigned int i = j;
@@ -452,7 +463,10 @@ mat decrypt_one(mat H, mat G, mat S, mat P, mat ciphertext, const Poly_t g_z, co
         retrieve(0, i) = ((unsigned)retrieve(0, i))%2;
     }
     
-    if(is_verbose) cout << "m = m' * S^-1" << endl;
+    if(is_verbose) {
+        // cout << "※ S는 permutation matrix이므로 S^-1 = S^T" << endl;
+        // cout << "m = m' * S^-1" << endl;
+    }
     print_part("m", retrieve);
 
     return retrieve;
